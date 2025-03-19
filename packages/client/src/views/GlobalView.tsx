@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Box, Typography, Slider, Tooltip } from '@mui/material';
 import * as d3 from 'd3';
 import { StaticStateData } from 'shared-types';
@@ -10,13 +11,18 @@ interface GlobalViewProps {
 }
 
 // 定义数据类型
-interface ProcessedData extends StaticStateData {
-  x: number; // 时间转换后的 x 坐标
-  y: number; // 负荷作为 y 坐标
-  color: string; // 基于热耗的颜色
+interface ProcessedData {
+  区间编号: number;
+  开始时间: Date;
+  结束时间: Date;
+  平均负荷: number;
+  平均热耗率: number;
+  color: string;
 }
 
 export const GlobalView: React.FC<GlobalViewProps> = () => {
+  const navigate = useNavigate();
+
   // 添加常量定义
   const margin = { top: 20, right: 30, bottom: 40, left: 50 };
 
@@ -160,8 +166,11 @@ export const GlobalView: React.FC<GlobalViewProps> = () => {
         if (tooltip) {
           tooltip.style.display = 'none';
         }
+      })
+      .on('click', (event, d) => {
+        navigate(`/detail/${d.区间编号}`);
       });
-  }, [data, dimensions, heatRateRange, timeScale]);
+  }, [data, dimensions, heatRateRange, timeScale, navigate]);
 
   return (
     <Box

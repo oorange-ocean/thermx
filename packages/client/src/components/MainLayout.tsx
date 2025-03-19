@@ -44,7 +44,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
   ];
 
   return (
-    <Box sx={{ display: 'flex' }}>
+    <Box sx={{ display: 'flex', width: '100%', height: '100%', overflow: 'hidden' }}>
       <AppBar
         position="fixed"
         sx={{
@@ -101,7 +101,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
         }}
       >
         <Toolbar />
-        <Box sx={{ overflow: 'hidden' }}>
+        <Box sx={{ overflow: 'hidden', height: '100%' }}>
           <List>
             {menuItems.map((item) => (
               <ListItem key={item.text} disablePadding sx={{ display: 'block' }}>
@@ -135,17 +135,23 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
         component="main"
         sx={{
           flexGrow: 1,
-          p: 3,
-          width: '100%',
-          marginLeft: open ? 0 : `${theme.spacing(-7)}px`,
-          transition: theme.transitions.create(['width', 'margin'], {
-            easing: theme.transitions.easing.sharp,
-            duration: theme.transitions.duration.leavingScreen,
-          }),
+          height: '100%',
+          display: 'flex',
+          flexDirection: 'column',
+          overflow: 'hidden',
         }}
       >
         <Toolbar />
-        {children}
+        <Box
+          sx={{
+            flexGrow: 1,
+            width: '100%',
+            overflow: 'auto',
+            p: 3,
+          }}
+        >
+          {children}
+        </Box>
       </Box>
     </Box>
   );
