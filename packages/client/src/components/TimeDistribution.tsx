@@ -16,7 +16,7 @@ export const TimeDistribution = ({ data, timeGranularity }: TimeDistributionProp
     d3.select(svgRef.current).selectAll('*').remove();
 
     // 设置尺寸和边距
-    const margin = { top: 20, right: 30, bottom: 40, left: 50 };
+    const margin = { top: 20, right: 120, bottom: 40, left: 50 };
     const width = svgRef.current.clientWidth;
     const height = svgRef.current.clientHeight;
     const innerWidth = width - margin.left - margin.right;
@@ -132,10 +132,10 @@ export const TimeDistribution = ({ data, timeGranularity }: TimeDistributionProp
       });
 
     // 添加图例
-    const legend = svg.append('g').attr('transform', `translate(${innerWidth - 100}, 0)`);
+    const legend = svg.append('g').attr('transform', `translate(${innerWidth + 20}, 10)`);
 
     categories.forEach((category, i) => {
-      const legendRow = legend.append('g').attr('transform', `translate(0, ${i * 20})`);
+      const legendRow = legend.append('g').attr('transform', `translate(0, ${i * 25})`);
 
       legendRow
         .append('rect')
@@ -143,7 +143,12 @@ export const TimeDistribution = ({ data, timeGranularity }: TimeDistributionProp
         .attr('height', 15)
         .attr('fill', colorScale(String(category)));
 
-      legendRow.append('text').attr('x', 20).attr('y', 12).text(`类别 ${category}`);
+      legendRow
+        .append('text')
+        .attr('x', 25)
+        .attr('y', 12)
+        .style('font-size', '12px')
+        .text(`类别 ${category}`);
     });
   }, [data, timeGranularity]);
 
