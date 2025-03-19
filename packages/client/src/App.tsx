@@ -1,4 +1,4 @@
-import { CssBaseline, ThemeProvider, createTheme } from '@mui/material';
+import { CssBaseline, ThemeProvider, createTheme, Box } from '@mui/material';
 import { GlobalView } from './components/GlobalView';
 import { MainLayout } from './components/MainLayout';
 
@@ -18,9 +18,17 @@ function App() {
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      <MainLayout>
-        <GlobalView />
-      </MainLayout>
+      <Box
+        sx={{
+          width: '100vw',
+          height: '100vh',
+          overflow: 'hidden', // 防止出现滚动条
+        }}
+      >
+        <MainLayout>
+          <GlobalView />
+        </MainLayout>
+      </Box>
     </ThemeProvider>
   );
 }

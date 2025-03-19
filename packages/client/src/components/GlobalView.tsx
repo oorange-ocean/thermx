@@ -15,11 +15,29 @@ interface ProcessedData extends StaticStateData {
   color: string; // 基于热耗的颜色
 }
 
-export const GlobalView: React.FC<GlobalViewProps> = ({ width = 1200, height = 600 }) => {
+export const GlobalView: React.FC<GlobalViewProps> = () => {
+  const containerRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
+  const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
   const [data, setData] = useState<ProcessedData[]>([]);
   const [timeRange, setTimeRange] = useState<[number, number]>([0, 100]);
   const [heatRateRange, setHeatRateRange] = useState<[number, number]>([8000, 10000]);
+
+  // 添加 ResizeObserver 监听容器大小变化
+  useEffect(() => {
+    if (!containerRef.current) return;
+
+    const resizeObserver = new ResizeObserver((entries) => {
+      const { width, height } = entries[0].contentRect;
+      setDimensions({
+        width: Math.max(width - 40, 0), // 减去内边距
+        height: Math.max(height - 150, 0), // 减去标题和滑块的高度
+      });
+    });
+
+    resizeObserver.observe(containerRef.current);
+    return () => resizeObserver.disconnect();
+  }, []);
 
   // 加载数据
   useEffect(() => {
@@ -59,8 +77,8 @@ export const GlobalView: React.FC<GlobalViewProps> = ({ width = 1200, height = 6
     if (!data.length || !svgRef.current) return;
 
     const margin = { top: 20, right: 30, bottom: 40, left: 50 };
-    const innerWidth = width - margin.left - margin.right;
-    const innerHeight = height - margin.top - margin.bottom;
+    const innerWidth = dimensions.width - margin.left - margin.right;
+    const innerHeight = dimensions.height - margin.top - margin.bottom;
 
     // 清除旧的内容
     d3.select(svgRef.current).selectAll('*').remove();
@@ -90,14 +108,6 @@ export const GlobalView: React.FC<GlobalViewProps> = ({ width = 1200, height = 6
 
     svg.append('g').call(d3.axisLeft(yScale));
 
-    // 添加标题
-    svg
-      .append('text')
-      .attr('x', innerWidth / 2)
-      .attr('y', -margin.top / 2)
-      .attr('text-anchor', 'middle')
-      .text('工况全局视图');
-
     // 绘制散点
     svg
       .selectAll('circle')
@@ -126,10 +136,22 @@ export const GlobalView: React.FC<GlobalViewProps> = ({ width = 1200, height = 6
       .on('mouseout', () => {
         d3.select('#tooltip').style('visibility', 'hidden');
       });
-  }, [data, width, height]);
+  }, [data, dimensions.width, dimensions.height]);
 
   return (
-    <Box sx={{ p: 3 }}>
+    <Box
+      ref={containerRef}
+      sx={{
+        width: '100%',
+        height: 'calc(100vh - 88px)',
+        display: 'flex',
+        flexDirection: 'column',
+        minWidth: '600px',
+        minHeight: '400px',
+        position: 'relative',
+        flex: 1,
+      }}
+    >
       <Typography variant="h5" gutterBottom>
         工况全局视图
       </Typography>
@@ -146,7 +168,19 @@ export const GlobalView: React.FC<GlobalViewProps> = ({ width = 1200, height = 6
         />
       </Box>
 
-      <svg ref={svgRef} width={width} height={height} style={{ border: '1px solid #ccc' }} />
+      <Box sx={{ flexGrow: 1, position: 'relative' }}>
+        <svg
+          ref={svgRef}
+          width={dimensions.width}
+          height={dimensions.height}
+          style={{
+            border: '1px solid #ccc',
+            position: 'absolute',
+            top: 0,
+            left: 0,
+          }}
+        />
+      </Box>
 
       <div
         id="tooltip"

@@ -131,7 +131,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
         sx={{
           flexGrow: 1,
           p: 3,
-          width: `calc(100% - ${open ? DRAWER_WIDTH : theme.spacing(7)}px)`,
+          width: '100%',
           marginLeft: open ? 0 : `${theme.spacing(-7)}px`,
           transition: theme.transitions.create(['width', 'margin'], {
             easing: theme.transitions.easing.sharp,
