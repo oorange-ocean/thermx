@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Box, Typography, Slider, Tooltip } from '@mui/material';
 import * as d3 from 'd3';
 import { StaticStateData } from 'shared-types';
-import { GlobalViewToolbar } from './GlobalViewToolbar';
+import { GlobalViewToolbar } from '../components/GlobalViewToolbar';
 
 interface GlobalViewProps {
   width?: number;

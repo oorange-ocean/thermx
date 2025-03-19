@@ -1,4 +1,5 @@
 import { ReactNode, useState } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import {
   Box,
   Drawer,
@@ -30,6 +31,8 @@ interface MainLayoutProps {
 export const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
   const [open, setOpen] = useState(true);
   const theme = useTheme();
+  const navigate = useNavigate();
+  const location = useLocation();
 
   const handleDrawerToggle = () => {
     setOpen(!open);
@@ -103,6 +106,8 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
             {menuItems.map((item) => (
               <ListItem key={item.text} disablePadding sx={{ display: 'block' }}>
                 <ListItemButton
+                  selected={location.pathname === item.path}
+                  onClick={() => navigate(item.path)}
                   sx={{
                     minHeight: 48,
                     justifyContent: open ? 'initial' : 'center',
