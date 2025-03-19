@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Box, Typography, Slider } from '@mui/material';
 import * as d3 from 'd3';
 import { StaticStateData } from 'shared-types';
+import { GlobalViewToolbar } from './GlobalViewToolbar';
 
 interface GlobalViewProps {
   width?: number;
@@ -80,6 +81,11 @@ export const GlobalView: React.FC<GlobalViewProps> = () => {
     const innerWidth = dimensions.width - margin.left - margin.right;
     const innerHeight = dimensions.height - margin.top - margin.bottom;
 
+    // 根据热耗率范围筛选数据
+    const filteredData = data.filter(
+      (d) => d.修正后热耗率q >= heatRateRange[0] && d.修正后热耗率q <= heatRateRange[1]
+    );
+
     // 清除旧的内容
     d3.select(svgRef.current).selectAll('*').remove();
 
@@ -88,14 +94,14 @@ export const GlobalView: React.FC<GlobalViewProps> = () => {
       .append('g')
       .attr('transform', `translate(${margin.left},${margin.top})`);
 
-    // 创建比例尺
-    const timeExtent = d3.extent(data.map((d) => new Date(d.x))) as [Date, Date];
+    // 创建比例尺 - 使用筛选后的数据
+    const timeExtent = d3.extent(filteredData.map((d) => new Date(d.x))) as [Date, Date];
 
     const xScale = d3.scaleTime().domain(timeExtent).range([0, innerWidth]);
 
     const yScale = d3
       .scaleLinear()
-      .domain([0, d3.max(data, (d) => d.y) || 0])
+      .domain([0, d3.max(filteredData, (d) => d.y) || 0])
       .range([innerHeight, 0]);
 
     const colorScale = d3
@@ -108,10 +114,10 @@ export const GlobalView: React.FC<GlobalViewProps> = () => {
 
     svg.append('g').call(d3.axisLeft(yScale));
 
-    // 绘制散点
+    // 绘制散点 - 使用筛选后的数据
     svg
       .selectAll('circle')
-      .data(data)
+      .data(filteredData)
       .join('circle')
       .attr('cx', (d) => xScale(new Date(d.x)))
       .attr('cy', (d) => yScale(d.y))
@@ -136,7 +142,7 @@ export const GlobalView: React.FC<GlobalViewProps> = () => {
       .on('mouseout', () => {
         d3.select('#tooltip').style('visibility', 'hidden');
       });
-  }, [data, dimensions.width, dimensions.height]);
+  }, [data, dimensions.width, dimensions.height, heatRateRange]);
 
   return (
     <Box
@@ -156,17 +162,16 @@ export const GlobalView: React.FC<GlobalViewProps> = () => {
         工况全局视图
       </Typography>
 
-      <Box sx={{ mb: 2 }}>
-        <Typography gutterBottom>热耗率范围 (kJ/kWh)</Typography>
-        <Slider
-          value={heatRateRange}
-          onChange={(_, newValue) => setHeatRateRange(newValue as [number, number])}
-          min={8000}
-          max={10000}
-          step={100}
-          valueLabelDisplay="auto"
-        />
-      </Box>
+      <GlobalViewToolbar
+        heatRateRange={heatRateRange}
+        onHeatRateRangeChange={setHeatRateRange}
+        filteredCount={
+          data.filter(
+            (d) => d.修正后热耗率q >= heatRateRange[0] && d.修正后热耗率q <= heatRateRange[1]
+          ).length
+        }
+        totalCount={data.length}
+      />
 
       <Box sx={{ flexGrow: 1, position: 'relative' }}>
         <svg
