@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Box, Typography, Slider } from '@mui/material';
+import { Box, Typography, Slider, Tooltip } from '@mui/material';
 import * as d3 from 'd3';
 import { StaticStateData } from 'shared-types';
 import { GlobalViewToolbar } from './GlobalViewToolbar';
@@ -25,7 +25,7 @@ export const GlobalView: React.FC<GlobalViewProps> = () => {
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
   const [data, setData] = useState<ProcessedData[]>([]);
   const [timeRange, setTimeRange] = useState<[number, number]>([0, 100]);
-  const [heatRateRange, setHeatRateRange] = useState<[number, number]>([8000, 10000]);
+  const [heatRateRange, setHeatRateRange] = useState<[number, number]>([7000, 10000]);
   const [transform, setTransform] = useState(d3.zoomIdentity);
   const [barHeight, setBarHeight] = useState(10);
   const [yAxisRange, setYAxisRange] = useState<[number, number]>([200, 800]);
@@ -58,7 +58,7 @@ export const GlobalView: React.FC<GlobalViewProps> = () => {
         const groupedData = d3.group(response, (d) => d.稳态区间编号);
         const processedData = Array.from(groupedData)
           .map(([id, group]) => {
-            if (id === 'null' || id === '0') return null; // 跳过非稳态数据
+            if (id === 'null' || id === '0') return null;
 
             const times = group.map((d) => new Date(d.时间));
             const loads = group.map((d) => +d.机组负荷);
@@ -73,10 +73,15 @@ export const GlobalView: React.FC<GlobalViewProps> = () => {
               color: d3.interpolateRdYlGn((10000 - d3.mean(heatRates)!) / 2000),
             };
           })
-          .filter((d) => d !== null); // 过滤掉非稳态数据
+          .filter((d) => d !== null);
+
+        // 计算热耗率的范围
+        const heatRateExtent = d3.extent(processedData, (d) => d.平均热耗率) as [number, number];
 
         console.log('数据处理完成，稳态区间数:', processedData.length);
         setData(processedData as any);
+        // 设置初始热耗率范围
+        setHeatRateRange(heatRateExtent);
       } catch (error) {
         console.error('数据加载失败:', error);
       }
@@ -131,7 +136,31 @@ export const GlobalView: React.FC<GlobalViewProps> = () => {
       .attr('y', (d) => yScale(d.平均负荷))
       .attr('width', (d) => Math.max(1, xScale(d.结束时间) - xScale(d.开始时间)))
       .attr('height', 10)
-      .attr('fill', (d) => d.color);
+      .attr('fill', (d) => d.color)
+      .style('cursor', 'pointer')
+      .on('mouseover', (event, d) => {
+        const tooltip = document.getElementById('global-view-tooltip');
+        if (tooltip) {
+          tooltip.style.display = 'block';
+          tooltip.style.left = `${event.pageX + 10}px`;
+          tooltip.style.top = `${event.pageY - 10}px`;
+          tooltip.innerHTML = `
+            <div style="padding: 8px;">
+              <div>稳态区间: ${d.区间编号}</div>
+              <div>开始时间: ${d.开始时间.toLocaleString()}</div>
+              <div>结束时间: ${d.结束时间.toLocaleString()}</div>
+              <div>平均负荷: ${d.平均负荷.toFixed(2)} MW</div>
+              <div>平均热耗率: ${d.平均热耗率.toFixed(2)} kJ/kWh</div>
+            </div>
+          `;
+        }
+      })
+      .on('mouseout', () => {
+        const tooltip = document.getElementById('global-view-tooltip');
+        if (tooltip) {
+          tooltip.style.display = 'none';
+        }
+      });
   }, [data, dimensions, heatRateRange, timeScale]);
 
   return (
@@ -162,6 +191,7 @@ export const GlobalView: React.FC<GlobalViewProps> = () => {
             .length
         }
         totalCount={data.length}
+        heatRateExtent={d3.extent(data, (d) => d.平均热耗率) as [number, number]}
       />
 
       <Box
@@ -202,6 +232,21 @@ export const GlobalView: React.FC<GlobalViewProps> = () => {
           <g transform={`translate(${margin.left},${margin.top})`}>{/* 图表内容 */}</g>
         </svg>
       </Box>
+
+      <div
+        id="global-view-tooltip"
+        style={{
+          position: 'fixed',
+          display: 'none',
+          backgroundColor: 'rgba(255, 255, 255, 0.95)',
+          border: '1px solid #ccc',
+          borderRadius: '4px',
+          boxShadow: '0 2px 6px rgba(0,0,0,0.15)',
+          zIndex: 1000,
+          fontSize: '14px',
+          pointerEvents: 'none',
+        }}
+      />
     </Box>
   );
 };

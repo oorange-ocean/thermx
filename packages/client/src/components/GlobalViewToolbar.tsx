@@ -7,6 +7,7 @@ interface GlobalViewToolbarProps {
   onTimeScaleChange: (scale: number) => void;
   filteredCount?: number;
   totalCount?: number;
+  heatRateExtent: [number, number];
 }
 
 export const GlobalViewToolbar: React.FC<GlobalViewToolbarProps> = ({
@@ -16,6 +17,7 @@ export const GlobalViewToolbar: React.FC<GlobalViewToolbarProps> = ({
   onTimeScaleChange,
   filteredCount = 0,
   totalCount = 0,
+  heatRateExtent,
 }) => {
   // 修改时间刻度选项，只保留刻度点，不显示标签
   const timeScaleOptions = [{ value: 4 }, { value: 12 }, { value: 24 }, { value: 48 }];
@@ -45,8 +47,8 @@ export const GlobalViewToolbar: React.FC<GlobalViewToolbarProps> = ({
         <Slider
           value={heatRateRange}
           onChange={(_, newValue) => onHeatRateRangeChange(newValue as [number, number])}
-          min={8000}
-          max={10000}
+          min={heatRateExtent[0]}
+          max={heatRateExtent[1]}
           step={100}
           valueLabelDisplay="auto"
           valueLabelFormat={(value) => `${value} kJ/kWh`}
