@@ -14,11 +14,22 @@ export const ParameterDistribution = ({ data, parameter }: ParameterDistribution
   useEffect(() => {
     if (!data.length || !svgRef.current) return;
 
+    // 首先过滤掉无效数据
+    const validData = data.filter((d) => {
+      const value = d[parameter];
+      return !isNaN(value) && value !== null && value > 0;
+    });
+
+    if (validData.length === 0) {
+      console.warn('No valid data after filtering');
+      return;
+    }
+
     // 清除旧内容
     d3.select(svgRef.current).selectAll('*').remove();
 
     // 设置尺寸和边距
-    const margin = { top: 20, right: 30, bottom: 40, left: 50 };
+    const margin = { top: 20, right: 120, bottom: 40, left: 50 };
     const width = svgRef.current.clientWidth;
     const height = svgRef.current.clientHeight;
     const innerWidth = width - margin.left - margin.right;
@@ -30,50 +41,45 @@ export const ParameterDistribution = ({ data, parameter }: ParameterDistribution
       .append('g')
       .attr('transform', `translate(${margin.left},${margin.top})`);
 
-    // 获取所有类别
-    const categories = Array.from(new Set(data.map((d) => d.类别))).sort();
+    // 获取所有类别（使用过滤后的数据）
+    const categories = Array.from(new Set(validData.map((d) => d.类别))).sort();
 
-    // 创建比例尺
+    // 使用过滤后的数据创建比例尺
     const xScale = d3
       .scaleBand()
       .domain(categories.map(String))
       .range([0, innerWidth])
       .padding(0.1);
 
-    const yScale = d3
-      .scaleLinear()
-      .domain(d3.extent(data, (d) => d[parameter]) as [number, number])
-      .range([innerHeight, 0]);
+    // 计算参数的实际范围
+    const parameterExtent = d3.extent(validData, (d) => d[parameter]) as [number, number];
+    const padding = (parameterExtent[1] - parameterExtent[0]) * 0.05;
+    const yMin = Math.floor((parameterExtent[0] - padding) / 100) * 100;
+    const yMax = Math.ceil((parameterExtent[1] + padding) / 100) * 100;
 
+    const yScale = d3.scaleLinear().domain([yMin, yMax]).range([innerHeight, 0]);
+
+    // 添加颜色比例尺
     const colorScale = d3.scaleOrdinal(d3.schemeTableau10).domain(categories.map(String));
-
-    // 创建小提琴图的核密度估计函数
-    const kde = (kernel: any, thresholds: number[], data: number[]): DensityPoint[] => {
-      return thresholds.map((x) => [x, d3.mean(data, (d) => kernel(x - d)) || 0]);
-    };
-
-    const epanechnikov = (bandwidth: number) => {
-      return (x: number) =>
-        Math.abs((x /= bandwidth)) <= 1 ? (0.75 * (1 - x * x)) / bandwidth : 0;
-    };
 
     // 为每个类别绘制小提琴图
     categories.forEach((category) => {
-      const categoryData = data.filter((d) => d.类别 === category).map((d) => d[parameter]);
+      const categoryData = validData.filter((d) => d.类别 === category).map((d) => d[parameter]);
       console.log(`Category ${category} data:`, categoryData); // 检查原始数据
 
-      // 过滤掉无效值
-      const validData = categoryData.filter((d) => !isNaN(d) && d !== null);
-      if (validData.length === 0) {
-        console.warn(`No valid data for category ${category}`);
-        return;
-      }
+      const bandwidth = Math.max(0.2, (d3.deviation(categoryData) ?? 0) / 4 || 0.2);
+      const thresholds = d3.range(yMin, yMax, bandwidth);
 
-      const bandwidth = Math.max(0.2, (d3.deviation(validData) ?? 0) / 4 || 0.2);
-      const extent = d3.extent(validData) as [number, number];
-      const thresholds = d3.range(extent[0], extent[1] + bandwidth, bandwidth);
+      const kde = (kernel: any, thresholds: number[], data: number[]): DensityPoint[] => {
+        return thresholds.map((x) => [x, d3.mean(data, (d) => kernel(x - d)) || 0]);
+      };
 
-      const density = kde(epanechnikov(bandwidth), thresholds, validData);
+      const epanechnikov = (bandwidth: number) => {
+        return (x: number) =>
+          Math.abs((x /= bandwidth)) <= 1 ? (0.75 * (1 - x * x)) / bandwidth : 0;
+      };
+
+      const density = kde(epanechnikov(bandwidth), thresholds, categoryData);
       const maxDensity = d3.max(density, (d) => d[1]) || 0;
       console.log(`Category ${category} density:`, density); // 检查密度估计结果
 
