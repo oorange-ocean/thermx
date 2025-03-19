@@ -5,7 +5,7 @@ module.exports = {
       script: 'serve', // 使用 serve 包来托管静态文件
       env: {
         PM2_SERVE_PATH: './packages/client/dist',
-        PM2_SERVE_PORT: 3001,
+        PM2_SERVE_PORT: 5000,
         PM2_SERVE_SPA: 'true',
       },
     },
@@ -14,7 +14,7 @@ module.exports = {
       script: './packages/server/dist/main.js',
       env: {
         NODE_ENV: 'production',
-        PORT: 3000,
+        PORT: 5001,
       },
     },
   ],
