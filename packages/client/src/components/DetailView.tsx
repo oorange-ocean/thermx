@@ -25,7 +25,22 @@ interface StatInfo {
   std: number;
   min: number;
   max: number;
+  validCount: number;
+  totalCount: number;
 }
+
+// 添加辅助函数来判断数值是否有效
+const isValidNumber = (value: number): boolean => {
+  return value !== null && value !== undefined && !isNaN(value) && value !== 0;
+};
+
+// 格式化数值显示
+const formatValue = (value: number | undefined): string => {
+  if (!value || !isValidNumber(value)) {
+    return '数据缺失';
+  }
+  return value.toFixed(2);
+};
 
 export const DetailView = ({ onClose }: DetailViewProps) => {
   const { steadyStateId } = useParams<{ steadyStateId: string }>();
@@ -118,13 +133,27 @@ export const DetailView = ({ onClose }: DetailViewProps) => {
 
         const statsData: { [key: string]: StatInfo } = {};
         keyParameters.forEach((param) => {
-          const values = filteredData.map((d) => d[param] as number);
-          statsData[param] = {
-            mean: d3.mean(values) || 0,
-            std: d3.deviation(values) || 0,
-            min: d3.min(values) || 0,
-            max: d3.max(values) || 0,
-          };
+          const values = filteredData.map((d) => d[param] as number).filter(isValidNumber); // 过滤掉无效值
+
+          if (values.length === 0) {
+            statsData[param] = {
+              mean: 0,
+              std: 0,
+              min: 0,
+              max: 0,
+              validCount: 0,
+              totalCount: filteredData.length,
+            };
+          } else {
+            statsData[param] = {
+              mean: d3.mean(values) || 0,
+              std: d3.deviation(values) || 0,
+              min: d3.min(values) || 0,
+              max: d3.max(values) || 0,
+              validCount: values.length,
+              totalCount: filteredData.length,
+            };
+          }
         });
 
         setTimeSeriesData(filteredData);
@@ -171,18 +200,37 @@ export const DetailView = ({ onClose }: DetailViewProps) => {
     const subPlotHeight = innerHeight / keyParameters.length;
 
     keyParameters.forEach((param, i) => {
+      // 过滤出有效的数据点
+      const validData = timeSeriesData.filter((d) => isValidNumber(d[param] as number));
+
+      if (validData.length === 0) {
+        // 如果没有有效数据，显示提示文本
+        svgG
+          .append('text')
+          .attr('x', innerWidth / 2)
+          .attr('y', i * subPlotHeight + subPlotHeight / 2)
+          .attr('text-anchor', 'middle')
+          .attr('alignment-baseline', 'middle')
+          .style('font-size', '12px')
+          .style('fill', '#666')
+          .text(`${param} - 无有效数据`);
+        return;
+      }
+
       const yScale = d3
         .scaleLinear()
         .domain([
-          d3.min(timeSeriesData, (d) => d[param] as number) || 0,
-          d3.max(timeSeriesData, (d) => d[param] as number) || 0,
+          d3.min(validData, (d) => d[param] as number) || 0,
+          d3.max(validData, (d) => d[param] as number) || 0,
         ])
         .range([subPlotHeight - 5, 5]);
 
+      // 创建一个分段的线条生成器
       const line = d3
         .line<TimeSeriesData>()
         .x((d) => xScale(d.时间))
-        .y((d) => yScale(d[param] as number));
+        .y((d) => yScale(d[param] as number))
+        .defined((d) => isValidNumber(d[param] as number)); // 只在有效数据点之间绘制线条
 
       // 绘制Y轴
       svgG
@@ -200,20 +248,166 @@ export const DetailView = ({ onClose }: DetailViewProps) => {
         .style('font-size', '12px')
         .text(param);
 
-      // 绘制时间序列线
+      // 添加背景条纹
       svgG
+        .append('rect')
+        .attr('x', 0)
+        .attr('y', i * subPlotHeight)
+        .attr('width', innerWidth)
+        .attr('height', subPlotHeight)
+        .attr('fill', i % 2 === 0 ? '#f8f9fa' : '#ffffff')
+        .attr('opacity', 0.5);
+
+      // 绘制时间序列线
+      const path = svgG
         .append('path')
         .datum(timeSeriesData)
         .attr('fill', 'none')
-        .attr('stroke', 'steelblue')
+        .attr('stroke', '#1976d2')
         .attr('stroke-width', 1.5)
         .attr('transform', `translate(0,${i * subPlotHeight})`)
         .attr('d', line);
+
+      // 添加数据点
+      svgG
+        .selectAll(`.dot-${i}`)
+        .data(validData)
+        .enter()
+        .append('circle')
+        .attr('class', `dot-${i}`)
+        .attr('cx', (d) => xScale(d.时间))
+        .attr('cy', (d) => yScale(d[param] as number) + i * subPlotHeight)
+        .attr('r', 2)
+        .attr('fill', '#1976d2')
+        .attr('opacity', 0.6);
+
+      // 添加悬停效果
+      const tooltip = d3
+        .select('body')
+        .append('div')
+        .attr('class', 'tooltip')
+        .style('position', 'absolute')
+        .style('visibility', 'hidden')
+        .style('background-color', 'rgba(0,0,0,0.8)')
+        .style('color', 'white')
+        .style('padding', '5px')
+        .style('border-radius', '4px')
+        .style('font-size', '12px');
+
+      svgG
+        .selectAll(`.dot-${i}`)
+        .on('mouseover', (event, d) => {
+          tooltip
+            .style('visibility', 'visible')
+            .html(
+              `时间: ${d3.timeFormat('%Y-%m-%d %H:%M:%S')(d.时间)}<br/>${param}: ${(
+                d[param] as number
+              ).toFixed(2)}`
+            )
+            .style('left', event.pageX + 10 + 'px')
+            .style('top', event.pageY - 10 + 'px');
+        })
+        .on('mouseout', () => {
+          tooltip.style('visibility', 'hidden');
+        });
     });
 
     // 绘制X轴（底部）
-    svgG.append('g').attr('transform', `translate(0,${innerHeight})`).call(d3.axisBottom(xScale));
+    svgG
+      .append('g')
+      .attr('transform', `translate(0,${innerHeight})`)
+      .call(d3.axisBottom(xScale).ticks(5).tickFormat(d3.timeFormat('%m-%d %H:%M')));
   }, [timeSeriesData, selectedTimeRange, keyParameters]);
+
+  // 渲染统计信息卡片
+  const renderStatCard = (param: string) => {
+    const stat = stats[param];
+    const hasValidData = stat?.validCount > 0;
+    const validityRatio = stat ? (stat.validCount / stat.totalCount) * 100 : 0;
+
+    return (
+      <Paper
+        elevation={1}
+        sx={{
+          p: 2,
+          height: '100%',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 1,
+          borderRadius: '6px',
+          transition: 'all 0.2s ease-in-out',
+          backgroundColor: hasValidData ? '#ffffff' : '#f5f5f5',
+          '&:hover': {
+            transform: 'translateY(-2px)',
+            boxShadow: '0 4px 8px rgba(0,0,0,0.1)',
+          },
+        }}
+      >
+        <Typography
+          variant="subtitle2"
+          sx={{
+            fontWeight: 500,
+            color: hasValidData ? '#1976d2' : '#666',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+          }}
+        >
+          <span>{param}</span>
+          {!hasValidData && (
+            <Typography
+              component="span"
+              sx={{
+                fontSize: '0.75rem',
+                color: '#ff9800',
+                backgroundColor: 'rgba(255,152,0,0.1)',
+                padding: '2px 6px',
+                borderRadius: '4px',
+              }}
+            >
+              无有效数据
+            </Typography>
+          )}
+        </Typography>
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+          {hasValidData ? (
+            <>
+              <Typography variant="body2" sx={{ color: '#666' }}>
+                均值:{' '}
+                <span style={{ color: '#333', fontWeight: 500 }}>{formatValue(stat?.mean)}</span>
+              </Typography>
+              <Typography variant="body2" sx={{ color: '#666' }}>
+                标准差:{' '}
+                <span style={{ color: '#333', fontWeight: 500 }}>{formatValue(stat?.std)}</span>
+              </Typography>
+              <Typography variant="body2" sx={{ color: '#666' }}>
+                最小值:{' '}
+                <span style={{ color: '#333', fontWeight: 500 }}>{formatValue(stat?.min)}</span>
+              </Typography>
+              <Typography variant="body2" sx={{ color: '#666' }}>
+                最大值:{' '}
+                <span style={{ color: '#333', fontWeight: 500 }}>{formatValue(stat?.max)}</span>
+              </Typography>
+              <Typography
+                variant="body2"
+                sx={{
+                  color: validityRatio < 50 ? '#ff9800' : '#4caf50',
+                  fontSize: '0.75rem',
+                  mt: 1,
+                }}
+              >
+                数据完整度: {validityRatio.toFixed(1)}%
+              </Typography>
+            </>
+          ) : (
+            <Typography variant="body2" sx={{ color: '#666', fontStyle: 'italic' }}>
+              该参数在当前时间段内的数据已被过滤
+            </Typography>
+          )}
+        </Box>
+      </Paper>
+    );
+  };
 
   // 如果正在加载，显示加载状态
   if (loading) {
@@ -313,52 +507,7 @@ export const DetailView = ({ onClose }: DetailViewProps) => {
         <Grid container spacing={2}>
           {keyParameters.map((param) => (
             <Grid item xs={12} sm={6} md={4} key={param}>
-              <Paper
-                elevation={1}
-                sx={{
-                  p: 2,
-                  height: '100%',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: 1,
-                  borderRadius: '6px',
-                  transition: 'all 0.2s ease-in-out',
-                  '&:hover': {
-                    transform: 'translateY(-2px)',
-                    boxShadow: '0 4px 8px rgba(0,0,0,0.1)',
-                  },
-                }}
-              >
-                <Typography variant="subtitle2" sx={{ fontWeight: 500, color: '#1976d2' }}>
-                  {param}
-                </Typography>
-                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
-                  <Typography variant="body2" sx={{ color: '#666' }}>
-                    均值:{' '}
-                    <span style={{ color: '#333', fontWeight: 500 }}>
-                      {stats[param]?.mean.toFixed(2)}
-                    </span>
-                  </Typography>
-                  <Typography variant="body2" sx={{ color: '#666' }}>
-                    标准差:{' '}
-                    <span style={{ color: '#333', fontWeight: 500 }}>
-                      {stats[param]?.std.toFixed(2)}
-                    </span>
-                  </Typography>
-                  <Typography variant="body2" sx={{ color: '#666' }}>
-                    最小值:{' '}
-                    <span style={{ color: '#333', fontWeight: 500 }}>
-                      {stats[param]?.min.toFixed(2)}
-                    </span>
-                  </Typography>
-                  <Typography variant="body2" sx={{ color: '#666' }}>
-                    最大值:{' '}
-                    <span style={{ color: '#333', fontWeight: 500 }}>
-                      {stats[param]?.max.toFixed(2)}
-                    </span>
-                  </Typography>
-                </Box>
-              </Paper>
+              {renderStatCard(param)}
             </Grid>
           ))}
         </Grid>
