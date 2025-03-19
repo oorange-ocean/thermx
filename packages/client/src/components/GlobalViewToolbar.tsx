@@ -17,13 +17,8 @@ export const GlobalViewToolbar: React.FC<GlobalViewToolbarProps> = ({
   filteredCount = 0,
   totalCount = 0,
 }) => {
-  // 修改时间刻度选项
-  const timeScaleOptions = [
-    { value: 4, label: '4px = 1小时' }, // 最小刻度
-    { value: 12, label: '12px = 1小时' },
-    { value: 24, label: '24px = 1小时' },
-    { value: 48, label: '48px = 1小时' }, // 最大刻度
-  ];
+  // 修改时间刻度选项，只保留刻度点，不显示标签
+  const timeScaleOptions = [{ value: 4 }, { value: 12 }, { value: 24 }, { value: 48 }];
 
   return (
     <Box sx={{ display: 'flex', alignItems: 'center', gap: 3, mb: 2, p: 1 }}>
@@ -34,15 +29,12 @@ export const GlobalViewToolbar: React.FC<GlobalViewToolbarProps> = ({
         <Slider
           value={timeScale}
           onChange={(_, newValue) => onTimeScaleChange(newValue as number)}
-          min={4} // 最小 4px/小时
-          max={48} // 最大 48px/小时
+          min={4}
+          max={48}
           step={null}
-          marks={timeScaleOptions}
+          marks={timeScaleOptions} // 只有刻度点，没有标签
           valueLabelDisplay="auto"
-          valueLabelFormat={(value) => {
-            const option = timeScaleOptions.find((opt) => opt.value === value);
-            return option ? option.label : value;
-          }}
+          valueLabelFormat={(value) => `${value}px = 1小时`}
         />
       </Box>
 

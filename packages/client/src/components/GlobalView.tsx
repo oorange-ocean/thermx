@@ -172,6 +172,23 @@ export const GlobalView: React.FC<GlobalViewProps> = () => {
           '& svg': {
             minWidth: '100%',
           },
+          '&::-webkit-scrollbar': {
+            height: '12px',
+            width: '12px',
+          },
+          '&::-webkit-scrollbar-track': {
+            background: '#f0f0f0',
+            borderRadius: '6px',
+          },
+          '&::-webkit-scrollbar-thumb': {
+            background: '#888',
+            borderRadius: '6px',
+            '&:hover': {
+              background: '#666',
+            },
+          },
+          padding: '4px',
+          marginBottom: '8px',
         }}
       >
         <svg
