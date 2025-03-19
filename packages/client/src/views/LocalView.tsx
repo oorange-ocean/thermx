@@ -1,9 +1,25 @@
 import { useEffect, useState } from 'react';
 import { Box, Typography, Select, MenuItem } from '@mui/material';
 import * as d3 from 'd3';
+import type { DSVParsedArray } from 'd3';
 import { TimeDistribution } from '../components/TimeDistribution';
 import { ParameterDistribution } from '../components/ParameterDistribution';
 import { LocalViewToolbar } from '../components/LocalViewToolbar';
+
+interface SteadyStateData {
+  稳态区间编号: string;
+  时间: string;
+  主汽压力: string;
+  主汽温度: string;
+  再热温度: string;
+  汽轮机热耗率q: string;
+}
+
+interface ClusteringRawData {
+  稳态区间编号: string;
+  Cluster: string;
+  [key: string]: string; // 用于特征字段
+}
 
 interface ClusteringData {
   稳态区间编号: number;
@@ -13,7 +29,7 @@ interface ClusteringData {
   主汽温度: number;
   再热温度: number;
   汽轮机热耗率q: number;
-  [key: string]: number | Date; // 允许动态特征字段
+  [key: string]: number | Date;
 }
 
 export const LocalView = () => {
@@ -83,10 +99,10 @@ export const LocalView = () => {
           const [clusteringResponse, steadyStateResponse] = await Promise.all([
             fetch('/api/clustering-data')
               .then((res) => res.text())
-              .then(d3.csvParse),
+              .then((text) => d3.csvParse(text) as unknown as DSVParsedArray<ClusteringRawData>),
             fetch('/api/steady-state-data')
               .then((res) => res.text())
-              .then(d3.csvParse),
+              .then((text) => d3.csvParse(text) as unknown as DSVParsedArray<SteadyStateData>),
           ]);
           // 首先处理稳态数据，创建一个映射表
           const steadyStateMap = new Map(

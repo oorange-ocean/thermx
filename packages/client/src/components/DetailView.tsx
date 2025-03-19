@@ -296,12 +296,12 @@ export const DetailView = ({ onClose }: DetailViewProps) => {
 
       svgG
         .selectAll(`.dot-${i}`)
-        .on('mouseover', (event, d) => {
+        .on('mouseover', function (event: MouseEvent, d: unknown) {
           tooltip
             .style('visibility', 'visible')
             .html(
-              `时间: ${d3.timeFormat('%Y-%m-%d %H:%M:%S')(d.时间)}<br/>${param}: ${(
-                d[param] as number
+              `时间: ${d3.timeFormat('%Y-%m-%d %H:%M:%S')((d as TimeSeriesData).时间)}<br/>${param}: ${(
+                (d as TimeSeriesData)[param] as number
               ).toFixed(2)}`
             )
             .style('left', event.pageX + 10 + 'px')
@@ -316,7 +316,12 @@ export const DetailView = ({ onClose }: DetailViewProps) => {
     svgG
       .append('g')
       .attr('transform', `translate(0,${innerHeight})`)
-      .call(d3.axisBottom(xScale).ticks(5).tickFormat(d3.timeFormat('%m-%d %H:%M')));
+      .call(
+        d3
+          .axisBottom(xScale)
+          .ticks(5)
+          .tickFormat((d) => d3.timeFormat('%m-%d %H:%M')(d as Date))
+      );
   }, [timeSeriesData, selectedTimeRange, keyParameters]);
 
   // 渲染统计信息卡片
