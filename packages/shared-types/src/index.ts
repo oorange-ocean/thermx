@@ -10,3 +10,9 @@ export interface ApiResponse<T> {
   status: number;
   message: string;
 }
+
+// 导出热力系统数据类型
+export * from './thermalData';
+
+// 导出特征数据类型
+export * from './features';
