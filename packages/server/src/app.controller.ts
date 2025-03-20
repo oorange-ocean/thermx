@@ -8,6 +8,7 @@ import {
 import { AppService } from './app.service';
 import { createReadStream } from 'fs';
 import { join } from 'path';
+import { createGzip } from 'zlib';
 
 @Controller()
 export class AppController {
@@ -44,21 +45,31 @@ export class AppController {
 
   @Get('clustering-data')
   @Header('Content-Type', 'text/csv')
+  @Header('Content-Encoding', 'gzip')
   getClusteringData(): StreamableFile {
     this.logger.log('收到聚类数据请求');
     const filePath = this.getDataFilePath('clustering_data.csv');
     this.logger.log(`读取文件路径: ${filePath}`);
+
     const file = createReadStream(filePath);
-    return new StreamableFile(file);
+    const gzip = createGzip();
+    file.pipe(gzip);
+
+    return new StreamableFile(gzip);
   }
 
   @Get('steady-state-data')
   @Header('Content-Type', 'text/csv')
+  @Header('Content-Encoding', 'gzip')
   getSteadyStateData(): StreamableFile {
     this.logger.log('收到稳态数据请求');
     const filePath = this.getDataFilePath('steady_state_data.csv');
     this.logger.log(`读取文件路径: ${filePath}`);
+
     const file = createReadStream(filePath);
-    return new StreamableFile(file);
+    const gzip = createGzip();
+    file.pipe(gzip);
+
+    return new StreamableFile(gzip);
   }
 }
