@@ -4,6 +4,7 @@ import { Box, Typography, Slider, Tooltip, CircularProgress, Alert } from '@mui/
 import * as d3 from 'd3';
 import { StaticStateData } from 'shared-types';
 import { GlobalViewToolbar } from '../components/GlobalViewToolbar';
+import { API_BASE_URL } from '../config';
 
 interface GlobalViewProps {
   width?: number;
@@ -42,7 +43,6 @@ export const GlobalView: React.FC<GlobalViewProps> = () => {
   // 初始化尺寸 - 使用固定的默认值
   useEffect(() => {
     // 设置默认固定尺寸，不依赖容器的实际大小
-    console.log('设置默认尺寸');
     setDimensions({
       width: 800, // 使用固定的初始宽度
       height: 500, // 使用固定的初始高度
@@ -56,14 +56,11 @@ export const GlobalView: React.FC<GlobalViewProps> = () => {
       if (!entry) return;
 
       const rect = entry.contentRect;
-      console.log('容器尺寸变化:', rect);
 
       const minWidth = 600;
       const minHeight = 400;
       const newWidth = Math.max(rect.width - 40, minWidth);
       const newHeight = Math.max(rect.height - 150, minHeight);
-
-      console.log('设置新尺寸:', { width: newWidth, height: newHeight });
 
       setDimensions({
         width: newWidth,
@@ -81,26 +78,21 @@ export const GlobalView: React.FC<GlobalViewProps> = () => {
       try {
         setLoading(true);
         setError(null);
-        console.log('开始加载数据...');
-
-        const response = await fetch('/api/steady-state-data');
+        console.log(`API_BASE_URL: ${API_BASE_URL}`);
+        const response = await fetch(`${API_BASE_URL}/steady-state-data`);
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
 
         const text = await response.text();
-        console.log('获取到原始数据，长度:', text.length);
         const csvData = d3.csvParse(text);
-        console.log('CSV解析完成，行数:', csvData.length);
 
         // 按稳态区间编号分组并处理数据
         const groupedData = d3.group(csvData, (d) => d.稳态区间编号);
-        console.log('数据分组完成，组数:', groupedData.size);
 
         const processedData = Array.from(groupedData)
           .map(([id, group]) => {
             if (id === 'null' || id === '0') {
-              console.log(`跳过无效区间 ${id}`);
               return null;
             }
 
@@ -135,9 +127,7 @@ export const GlobalView: React.FC<GlobalViewProps> = () => {
 
         // 计算热耗率的范围
         const heatRateExtent = d3.extent(processedData, (d) => d.平均热耗率) as [number, number];
-        console.log('热耗率范围:', heatRateExtent);
 
-        console.log('数据处理完成，稳态区间数:', processedData.length);
         setData(processedData);
         setHeatRateRange(heatRateExtent);
       } catch (error) {
@@ -153,36 +143,25 @@ export const GlobalView: React.FC<GlobalViewProps> = () => {
 
   // 绘制图表
   useEffect(() => {
-    console.log('开始绘制图表...', {
-      数据长度: data.length,
-      SVG状态: svgRef.current ? '已就绪' : '未就绪',
-      容器尺寸: dimensions,
-    });
-
     // 仅检查必要条件
     if (!data.length || !svgRef.current) {
-      console.log('跳过绘制：数据为空或SVG未准备好');
       return;
     }
 
     if (dimensions.width === 0 || dimensions.height === 0) {
-      console.log('跳过绘制：容器尺寸未就绪');
       return;
     }
 
     const innerWidth = dimensions.width * timeScale - margin.left - margin.right;
     const innerHeight = dimensions.height - margin.top - margin.bottom;
-    console.log('图表内部尺寸:', { innerWidth, innerHeight });
 
     if (innerWidth <= 0 || innerHeight <= 0) {
-      console.log('跳过绘制：内部尺寸无效');
       return;
     }
 
     const filteredData = data.filter(
       (d) => d.平均热耗率 >= heatRateRange[0] && d.平均热耗率 <= heatRateRange[1]
     );
-    console.log('过滤后的数据点数:', filteredData.length);
 
     // 清除旧的内容
     d3.select(svgRef.current).selectAll('*').remove();
@@ -197,7 +176,6 @@ export const GlobalView: React.FC<GlobalViewProps> = () => {
       Date,
       Date,
     ];
-    console.log('时间范围:', timeExtent);
 
     const xScale = d3.scaleTime().domain(timeExtent).range([0, innerWidth]);
     const yScale = d3.scaleLinear().domain([200, 800]).range([innerHeight, 0]);

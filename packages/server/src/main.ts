@@ -19,6 +19,14 @@ async function bootstrap() {
   }
 
   const app = await NestFactory.create(AppModule);
+
+  // 允许跨域请求
+  app.enableCors({
+    origin: '*', // 在实际生产环境中，应该限制为您的前端域名
+    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
+    credentials: true,
+  });
+
   const port = process.env.PORT ?? 5001;
   await app.listen(port);
   logger.log(`应用已启动，监听端口: ${port}`);

@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom';
 import * as d3 from 'd3';
 import { Box, Paper, Typography, Grid, CircularProgress } from '@mui/material';
 import React from 'react';
+import { API_BASE_URL } from '../config';
 
 interface DetailViewProps {
   onClose?: () => void;
@@ -92,7 +93,7 @@ export const DetailView = React.memo(({ onClose }: DetailViewProps) => {
         setError(null);
         console.log('开始加载数据，稳态区间ID:', steadyStateId);
 
-        const response = await fetch('/api/steady-state-data', {
+        const response = await fetch(`${API_BASE_URL}/steady-state-data`, {
           signal: abortController.signal,
         });
 
@@ -259,7 +260,7 @@ export const DetailView = React.memo(({ onClose }: DetailViewProps) => {
 
     // 创建SVG容器
     const svgG = d3
-      .select<SVGSVGElement, unknown>(svg)
+      .select(svg)
       .append('g')
       .attr('transform', `translate(${margin.left},${margin.top})`);
 

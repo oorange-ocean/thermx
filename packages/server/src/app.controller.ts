@@ -42,7 +42,7 @@ export class AppController {
     }
   }
 
-  @Get('api/clustering-data')
+  @Get('clustering-data')
   @Header('Content-Type', 'text/csv')
   getClusteringData(): StreamableFile {
     this.logger.log('收到聚类数据请求');
@@ -52,7 +52,7 @@ export class AppController {
     return new StreamableFile(file);
   }
 
-  @Get('api/steady-state-data')
+  @Get('steady-state-data')
   @Header('Content-Type', 'text/csv')
   getSteadyStateData(): StreamableFile {
     this.logger.log('收到稳态数据请求');

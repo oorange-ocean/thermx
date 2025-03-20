@@ -5,6 +5,7 @@ import type { DSVParsedArray } from 'd3';
 import { TimeDistribution } from '../components/TimeDistribution';
 import { ParameterDistribution } from '../components/ParameterDistribution';
 import { LocalViewToolbar } from '../components/LocalViewToolbar';
+import { API_BASE_URL } from '../config';
 
 interface SteadyStateData {
   稳态区间编号: string;
@@ -42,10 +43,10 @@ export const LocalView = () => {
     const loadData = async () => {
       try {
         const [clusteringResponse, steadyStateResponse] = await Promise.all([
-          fetch('/api/clustering-data')
+          fetch(`${API_BASE_URL}/clustering-data`)
             .then((res) => res.text())
             .then((text) => d3.csvParse(text) as unknown as DSVParsedArray<ClusteringRawData>),
-          fetch('/api/steady-state-data')
+          fetch(`${API_BASE_URL}/steady-state-data`)
             .then((res) => res.text())
             .then((text) => d3.csvParse(text) as unknown as DSVParsedArray<SteadyStateData>),
         ]);
