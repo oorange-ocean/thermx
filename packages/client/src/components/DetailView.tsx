@@ -146,7 +146,8 @@ export const DetailView = React.memo(({ onClose }: DetailViewProps) => {
 
               // 验证所有数值字段
               const hasInvalidValue = Object.entries(numericData).some(
-                ([key, value]) => key !== '时间' && (isNaN(value) || !isFinite(value))
+                ([key, value]) =>
+                  key !== '时间' && typeof value === 'number' && (isNaN(value) || !isFinite(value))
               );
 
               if (hasInvalidValue) {
@@ -258,7 +259,7 @@ export const DetailView = React.memo(({ onClose }: DetailViewProps) => {
 
     // 创建SVG容器
     const svgG = d3
-      .select(svg)
+      .select<SVGSVGElement, unknown>(svg)
       .append('g')
       .attr('transform', `translate(${margin.left},${margin.top})`);
 
@@ -270,12 +271,12 @@ export const DetailView = React.memo(({ onClose }: DetailViewProps) => {
 
     // 创建一个容器来存储所有的提示框，而不是为每个图表创建新的提示框
     const tooltipId = 'detail-view-tooltip';
-    let tooltip = d3.select(`#${tooltipId}`);
+    let tooltip = d3.select<HTMLDivElement, unknown>(`#${tooltipId}`);
 
     // 如果提示框不存在，创建一个新的
     if (tooltip.empty()) {
       tooltip = d3
-        .select('body')
+        .select<HTMLDivElement, unknown>('body')
         .append('div')
         .attr('id', tooltipId)
         .attr('class', 'tooltip')
@@ -310,8 +311,16 @@ export const DetailView = React.memo(({ onClose }: DetailViewProps) => {
       const yScale = d3
         .scaleLinear()
         .domain([
-          d3.min(validData, (d) => d[param] as number) || 0,
-          d3.max(validData, (d) => d[param] as number) || 0,
+          d3.min<TimeSeriesData, number>(validData, (d) => {
+            const value = d[param];
+            // 这里只处理number类型的值，跳过Date类型
+            return typeof value === 'number' ? value : 0;
+          }) ?? 0,
+          d3.max<TimeSeriesData, number>(validData, (d) => {
+            const value = d[param];
+            // 这里只处理number类型的值，跳过Date类型
+            return typeof value === 'number' ? value : 0;
+          }) ?? 0,
         ])
         .range([subPlotHeight - 5, 5]);
 
