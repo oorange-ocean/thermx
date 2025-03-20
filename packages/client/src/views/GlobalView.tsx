@@ -58,7 +58,14 @@ export const GlobalView: React.FC<GlobalViewProps> = () => {
     const loadData = async () => {
       try {
         console.log('开始加载数据...');
-        const response = await d3.csv('/steady_state_data.csv');
+        const response = await fetch('/api/steady-state-data')
+          .then((res) => {
+            if (!res.ok) {
+              throw new Error(`HTTP error! status: ${res.status}`);
+            }
+            return res.text();
+          })
+          .then((text) => d3.csvParse(text));
 
         // 按稳态区间编号分组并处理数据
         const groupedData = d3.group(response, (d) => d.稳态区间编号);

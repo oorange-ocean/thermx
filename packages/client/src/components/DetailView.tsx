@@ -80,8 +80,9 @@ export const DetailView = ({ onClose }: DetailViewProps) => {
         setError(null);
         console.log('开始加载数据，稳态区间ID:', steadyStateId);
 
-        const response = await d3.csv('/steady_state_data.csv');
-        console.log('数据加载完成，开始处理...');
+        const response = await fetch('/api/steady-state-data')
+          .then((res) => res.text())
+          .then((text) => d3.csvParse(text));
 
         const filteredData = response
           .filter((d) => d.稳态区间编号 && +d.稳态区间编号 === +steadyStateId)
