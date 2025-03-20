@@ -13,15 +13,31 @@ export class AppController {
 
   @Get('clustering-data')
   async getClusteringData() {
-    // 在服务器端读取 /home/data/clustering_data.csv
-    const data = await fs.readFile('/home/data/clustering_data.csv', 'utf-8');
-    return data;
+    try {
+      // 添加日志
+      console.log('开始读取聚类数据文件...');
+      const data = await fs.readFile('/home/data/clustering_data.csv', 'utf-8');
+      console.log(`成功读取数据，数据长度: ${data.length}`);
+      return data;
+    } catch (error) {
+      console.error('读取聚类数据文件失败:', error);
+      throw error;
+    }
   }
 
   @Get('steady-state-data')
   async getSteadyStateData() {
-    // 在服务器端读取 /home/data/steady_state_data.csv
-    const data = await fs.readFile('/home/data/steady_state_data.csv', 'utf-8');
-    return data;
+    try {
+      console.log('开始读取稳态数据文件...');
+      const data = await fs.readFile(
+        '/home/data/steady_state_data.csv',
+        'utf-8',
+      );
+      console.log(`成功读取数据，数据长度: ${data.length}`);
+      return data;
+    } catch (error) {
+      console.error('读取稳态数据文件失败:', error);
+      throw error;
+    }
   }
 }
