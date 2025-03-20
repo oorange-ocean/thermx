@@ -5,6 +5,7 @@ import * as d3 from 'd3';
 import { StaticStateData } from 'shared-types';
 import { GlobalViewToolbar } from '../components/GlobalViewToolbar';
 import { API_BASE_URL } from '../config';
+import { dbCache } from '../utils/indexedDBCache';
 
 interface GlobalViewProps {
   width?: number;
@@ -39,6 +40,7 @@ export const GlobalView: React.FC<GlobalViewProps> = () => {
   const [timeScale, setTimeScale] = useState(12); // 默认 12px = 1小时
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [loadingProgress, setLoadingProgress] = useState(0);
 
   // 初始化尺寸 - 使用固定的默认值
   useEffect(() => {
@@ -78,14 +80,63 @@ export const GlobalView: React.FC<GlobalViewProps> = () => {
       try {
         setLoading(true);
         setError(null);
+        setLoadingProgress(0);
+
+        // 尝试从IndexedDB缓存获取数据
+        const cachedData = await dbCache.get<ProcessedData[]>('globalViewData');
+        if (cachedData) {
+          console.log('使用缓存数据，总数:', cachedData.length);
+          setData(cachedData);
+          setLoading(false);
+          return;
+        }
+
+        setLoadingProgress(10);
         console.log(`API_BASE_URL: ${API_BASE_URL}`);
+
+        // 带进度的数据加载
         const response = await fetch(`${API_BASE_URL}/steady-state-data`);
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
 
-        const text = await response.text();
+        // 读取总长度
+        const contentLength = response.headers.get('Content-Length');
+        const total = contentLength ? parseInt(contentLength, 10) : 0;
+        let loaded = 0;
+
+        // 创建响应流读取器
+        const reader = response.body!.getReader();
+        const chunks: Uint8Array[] = [];
+
+        // 读取数据块
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          chunks.push(value);
+          loaded += value.length;
+
+          // 更新加载进度
+          if (total) {
+            const progress = Math.round((loaded / total) * 80); // 最多占总进度的80%
+            setLoadingProgress(10 + progress);
+          }
+        }
+
+        // 合并所有数据块
+        const allChunks = new Uint8Array(loaded);
+        let position = 0;
+        for (const chunk of chunks) {
+          allChunks.set(chunk, position);
+          position += chunk.length;
+        }
+
+        // 解码为文本并解析CSV
+        const text = new TextDecoder().decode(allChunks);
         const csvData = d3.csvParse(text);
+
+        setLoadingProgress(90);
 
         // 按稳态区间编号分组并处理数据
         const groupedData = d3.group(csvData, (d) => d.稳态区间编号);
@@ -125,11 +176,30 @@ export const GlobalView: React.FC<GlobalViewProps> = () => {
           throw new Error('没有找到有效的稳态区间数据');
         }
 
-        // 计算热耗率的范围
-        const heatRateExtent = d3.extent(processedData, (d) => d.平均热耗率) as [number, number];
+        // 检查缓存数据是否存在，如果存在则比较哈希
+        const existingCachedData = await dbCache.get<ProcessedData[]>('globalViewData');
+        if (existingCachedData) {
+          // 比较新处理的数据与缓存数据的哈希
+          const hashMatch = await dbCache.compareHash('globalViewData', processedData);
+          if (hashMatch) {
+            // 哈希匹配，使用缓存数据
+            console.log('缓存数据哈希匹配，使用缓存');
+            setData(existingCachedData);
+            setLoading(false);
+            setLoadingProgress(100);
+            return;
+          } else {
+            console.log('缓存数据哈希不匹配，更新缓存');
+          }
+        } else {
+          console.log('未找到缓存数据，创建新缓存');
+        }
+
+        // 保存到IndexedDB缓存
+        await dbCache.set('globalViewData', processedData);
+        setLoadingProgress(100);
 
         setData(processedData);
-        setHeatRateRange(heatRateExtent);
       } catch (error) {
         console.error('数据加载失败:', error);
         setError(error instanceof Error ? error.message : '数据加载失败');
@@ -239,9 +309,12 @@ export const GlobalView: React.FC<GlobalViewProps> = () => {
 
   if (loading) {
     return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
-        <CircularProgress />
-      </Box>
+      <div className="loading-container">
+        <div className="loading-progress">
+          <div className="progress-bar" style={{ width: `${loadingProgress}%` }}></div>
+        </div>
+        <div className="loading-text">正在加载数据 ({loadingProgress}%)...</div>
+      </div>
     );
   }
 

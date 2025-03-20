@@ -6,6 +6,7 @@ import { TimeDistribution } from '../components/TimeDistribution';
 import { ParameterDistribution } from '../components/ParameterDistribution';
 import { LocalViewToolbar } from '../components/LocalViewToolbar';
 import { API_BASE_URL } from '../config';
+import { dbCache } from '../utils/indexedDBCache';
 
 interface SteadyStateData {
   稳态区间编号: string;
@@ -37,19 +38,89 @@ export const LocalView = () => {
   const [data, setData] = useState<ClusteringData[]>([]);
   const [selectedParameter, setSelectedParameter] = useState('汽轮机热耗率q');
   const [timeGranularity, setTimeGranularity] = useState<'hour' | 'day'>('hour');
+  const [loading, setLoading] = useState(false);
+  const [loadingProgress, setLoadingProgress] = useState(0);
 
   // 加载数据
   useEffect(() => {
     const loadData = async () => {
       try {
+        setLoading(true);
+        setLoadingProgress(0);
+
+        // 加载原始数据
         const [clusteringResponse, steadyStateResponse] = await Promise.all([
-          fetch(`${API_BASE_URL}/clustering-data`)
-            .then((res) => res.text())
-            .then((text) => d3.csvParse(text) as unknown as DSVParsedArray<ClusteringRawData>),
-          fetch(`${API_BASE_URL}/steady-state-data`)
-            .then((res) => res.text())
-            .then((text) => d3.csvParse(text) as unknown as DSVParsedArray<SteadyStateData>),
+          fetch(`${API_BASE_URL}/clustering-data`).then(async (response) => {
+            // 读取总长度
+            const contentLength = response.headers.get('Content-Length');
+            const total = contentLength ? parseInt(contentLength, 10) : 0;
+            let loaded = 0;
+
+            // 创建响应流读取器
+            const reader = response.body!.getReader();
+            const chunks: Uint8Array[] = [];
+
+            // 读取数据块
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) break;
+
+              chunks.push(value);
+              loaded += value.length;
+
+              // 更新加载进度
+              if (total) {
+                const progress = Math.round((loaded / total) * 40); // 最多占总进度的40%
+                setLoadingProgress(10 + progress);
+              }
+            }
+
+            // 合并所有数据块
+            const allChunks = new Uint8Array(loaded);
+            let position = 0;
+            for (const chunk of chunks) {
+              allChunks.set(chunk, position);
+              position += chunk.length;
+            }
+
+            // 解码为文本并解析CSV
+            const text = new TextDecoder().decode(allChunks);
+            return d3.csvParse(text) as unknown as DSVParsedArray<ClusteringRawData>;
+          }),
+          fetch(`${API_BASE_URL}/steady-state-data`).then(async (response) => {
+            // 读取总长度
+            const contentLength = response.headers.get('Content-Length');
+            const total = contentLength ? parseInt(contentLength, 10) : 0;
+            let loaded = 0;
+
+            const reader = response.body!.getReader();
+            const chunks: Uint8Array[] = [];
+
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) break;
+
+              chunks.push(value);
+              loaded += value.length;
+
+              if (total) {
+                const progress = Math.round((loaded / total) * 40); // 最多占总进度的40%
+                setLoadingProgress(50 + progress);
+              }
+            }
+
+            const allChunks = new Uint8Array(loaded);
+            let position = 0;
+            for (const chunk of chunks) {
+              allChunks.set(chunk, position);
+              position += chunk.length;
+            }
+
+            const text = new TextDecoder().decode(allChunks);
+            return d3.csvParse(text) as unknown as DSVParsedArray<SteadyStateData>;
+          }),
         ]);
+
         // 首先处理稳态数据，创建一个映射表
         const steadyStateMap = new Map(
           steadyStateResponse.map((d) => [
@@ -95,15 +166,54 @@ export const LocalView = () => {
           })
           .filter((d): d is ClusteringData => d !== null);
 
+        setLoadingProgress(90);
+
+        // 检查缓存数据是否存在，如果存在则比较哈希
+        const cachedData = await dbCache.get<ClusteringData[]>('localViewData');
+        if (cachedData) {
+          // 比较新处理的数据与缓存数据的哈希
+          const hashMatch = await dbCache.compareHash('localViewData', processedData);
+          if (hashMatch) {
+            // 哈希匹配，使用缓存数据
+            console.log('缓存数据哈希匹配，使用缓存');
+            setData(cachedData);
+            setLoading(false);
+            setLoadingProgress(100);
+            return;
+          } else {
+            console.log('缓存数据哈希不匹配，更新缓存');
+          }
+        } else {
+          console.log('未找到缓存数据，创建新缓存');
+        }
+
+        // 保存到IndexedDB缓存
+        await dbCache.set('localViewData', processedData);
+        setLoadingProgress(100);
+
         console.log('数据加载完成，总数:', processedData.length);
         setData(processedData);
       } catch (error) {
         console.error('加载数据失败:', error);
+      } finally {
+        setLoading(false);
       }
     };
 
     loadData();
   }, []);
+
+  // 显示加载进度条
+  if (loading) {
+    return (
+      <div className="loading-container">
+        <div className="loading-progress">
+          <div className="progress-bar" style={{ width: `${loadingProgress}%` }}></div>
+        </div>
+        <div className="loading-text">正在加载数据 ({loadingProgress}%)...</div>
+      </div>
+    );
+  }
 
   // 获取所有可用的参数列表
   const parameters = ['主汽压力', '主汽温度', '再热温度', '汽轮机热耗率q'];
