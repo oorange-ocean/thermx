@@ -41,117 +41,61 @@ export const LocalView = () => {
   useEffect(() => {
     const loadData = async () => {
       try {
-        if (import.meta.env.DEV) {
-          // 开发环境：直接从 public 文件夹读取
-          const [clusteringResponse, steadyStateResponse] = await Promise.all([
-            d3.csv('/clustering_data.csv'),
-            d3.csv('/steady_state_data.csv'),
-          ]);
-          // 首先处理稳态数据，创建一个映射表
-          const steadyStateMap = new Map(
-            steadyStateResponse.map((d) => [
-              +d.稳态区间编号,
-              {
-                时间: new Date(d.时间),
-                主汽压力: +d.主汽压力,
-                主汽温度: +d.主汽温度,
-                再热温度: +d.再热温度,
-                汽轮机热耗率q: +d.汽轮机热耗率q,
-              },
-            ])
-          );
+        const [clusteringResponse, steadyStateResponse] = await Promise.all([
+          fetch('/api/clustering-data')
+            .then((res) => res.text())
+            .then((text) => d3.csvParse(text) as unknown as DSVParsedArray<ClusteringRawData>),
+          fetch('/api/steady-state-data')
+            .then((res) => res.text())
+            .then((text) => d3.csvParse(text) as unknown as DSVParsedArray<SteadyStateData>),
+        ]);
+        // 首先处理稳态数据，创建一个映射表
+        const steadyStateMap = new Map(
+          steadyStateResponse.map((d) => [
+            +d.稳态区间编号,
+            {
+              时间: new Date(d.时间),
+              主汽压力: +d.主汽压力,
+              主汽温度: +d.主汽温度,
+              再热温度: +d.再热温度,
+              汽轮机热耗率q: +d.汽轮机热耗率q,
+            },
+          ])
+        );
 
-          // 处理聚类数据并合并稳态信息
-          const processedData = clusteringResponse
-            .map((d) => {
-              // 确保所有必要字段都是有效的数值
-              const 类别 = +d.Cluster;
-              const 稳态区间编号 = +d.稳态区间编号;
-              if (isNaN(类别) || isNaN(稳态区间编号)) return null;
+        // 处理聚类数据并合并稳态信息
+        const processedData = clusteringResponse
+          .map((d) => {
+            // 确保所有必要字段都是有效的数值
+            const 类别 = +d.Cluster;
+            const 稳态区间编号 = +d.稳态区间编号;
+            if (isNaN(类别) || isNaN(稳态区间编号)) return null;
 
-              // 获取对应的稳态数据
-              const steadyState = steadyStateMap.get(稳态区间编号);
-              if (!steadyState) return null;
+            // 获取对应的稳态数据
+            const steadyState = steadyStateMap.get(稳态区间编号);
+            if (!steadyState) return null;
 
-              // 构建特征对象
-              const features: { [key: string]: number } = {};
-              for (let i = 0; i < 64; i++) {
-                features[`feature_${i}`] = +d[`feature_${i}`];
-              }
+            // 构建特征对象
+            const features: { [key: string]: number } = {};
+            for (let i = 0; i < 64; i++) {
+              features[`feature_${i}`] = +d[`feature_${i}`];
+            }
 
-              return {
-                稳态区间编号,
-                类别,
-                时间: steadyState.时间,
-                主汽压力: steadyState.主汽压力,
-                主汽温度: steadyState.主汽温度,
-                再热温度: steadyState.再热温度,
-                汽轮机热耗率q: steadyState.汽轮机热耗率q,
-                ...features,
-              };
-            })
-            .filter((d): d is ClusteringData => d !== null);
+            return {
+              稳态区间编号,
+              类别,
+              时间: steadyState.时间,
+              主汽压力: steadyState.主汽压力,
+              主汽温度: steadyState.主汽温度,
+              再热温度: steadyState.再热温度,
+              汽轮机热耗率q: steadyState.汽轮机热耗率q,
+              ...features,
+            };
+          })
+          .filter((d): d is ClusteringData => d !== null);
 
-          console.log('数据加载完成，总数:', processedData.length);
-          setData(processedData);
-        } else {
-          // 生产环境：通过 API 获取
-          const [clusteringResponse, steadyStateResponse] = await Promise.all([
-            fetch('/api/clustering-data')
-              .then((res) => res.text())
-              .then((text) => d3.csvParse(text) as unknown as DSVParsedArray<ClusteringRawData>),
-            fetch('/api/steady-state-data')
-              .then((res) => res.text())
-              .then((text) => d3.csvParse(text) as unknown as DSVParsedArray<SteadyStateData>),
-          ]);
-          // 首先处理稳态数据，创建一个映射表
-          const steadyStateMap = new Map(
-            steadyStateResponse.map((d) => [
-              +d.稳态区间编号,
-              {
-                时间: new Date(d.时间),
-                主汽压力: +d.主汽压力,
-                主汽温度: +d.主汽温度,
-                再热温度: +d.再热温度,
-                汽轮机热耗率q: +d.汽轮机热耗率q,
-              },
-            ])
-          );
-
-          // 处理聚类数据并合并稳态信息
-          const processedData = clusteringResponse
-            .map((d) => {
-              // 确保所有必要字段都是有效的数值
-              const 类别 = +d.Cluster;
-              const 稳态区间编号 = +d.稳态区间编号;
-              if (isNaN(类别) || isNaN(稳态区间编号)) return null;
-
-              // 获取对应的稳态数据
-              const steadyState = steadyStateMap.get(稳态区间编号);
-              if (!steadyState) return null;
-
-              // 构建特征对象
-              const features: { [key: string]: number } = {};
-              for (let i = 0; i < 64; i++) {
-                features[`feature_${i}`] = +d[`feature_${i}`];
-              }
-
-              return {
-                稳态区间编号,
-                类别,
-                时间: steadyState.时间,
-                主汽压力: steadyState.主汽压力,
-                主汽温度: steadyState.主汽温度,
-                再热温度: steadyState.再热温度,
-                汽轮机热耗率q: steadyState.汽轮机热耗率q,
-                ...features,
-              };
-            })
-            .filter((d): d is ClusteringData => d !== null);
-
-          console.log('数据加载完成，总数:', processedData.length);
-          setData(processedData);
-        }
+        console.log('数据加载完成，总数:', processedData.length);
+        setData(processedData);
       } catch (error) {
         console.error('加载数据失败:', error);
       }

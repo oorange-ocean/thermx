@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useLayoutEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Box, Typography, Slider, Tooltip } from '@mui/material';
+import { Box, Typography, Slider, Tooltip, CircularProgress, Alert } from '@mui/material';
 import * as d3 from 'd3';
 import { StaticStateData } from 'shared-types';
 import { GlobalViewToolbar } from '../components/GlobalViewToolbar';
@@ -36,16 +36,38 @@ export const GlobalView: React.FC<GlobalViewProps> = () => {
   const [barHeight, setBarHeight] = useState(10);
   const [yAxisRange, setYAxisRange] = useState<[number, number]>([200, 800]);
   const [timeScale, setTimeScale] = useState(12); // 默认 12px = 1小时
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // 添加 ResizeObserver 监听容器大小变化
+  // 初始化尺寸 - 使用固定的默认值
   useEffect(() => {
+    // 设置默认固定尺寸，不依赖容器的实际大小
+    console.log('设置默认尺寸');
+    setDimensions({
+      width: 800, // 使用固定的初始宽度
+      height: 500, // 使用固定的初始高度
+    });
+
+    // 然后再设置 ResizeObserver 来处理后续的调整
     if (!containerRef.current) return;
 
     const resizeObserver = new ResizeObserver((entries) => {
-      const { width, height } = entries[0].contentRect;
+      const entry = entries[0];
+      if (!entry) return;
+
+      const rect = entry.contentRect;
+      console.log('容器尺寸变化:', rect);
+
+      const minWidth = 600;
+      const minHeight = 400;
+      const newWidth = Math.max(rect.width - 40, minWidth);
+      const newHeight = Math.max(rect.height - 150, minHeight);
+
+      console.log('设置新尺寸:', { width: newWidth, height: newHeight });
+
       setDimensions({
-        width: Math.max(width - 40, 0), // 减去内边距
-        height: Math.max(height - 150, 0), // 减去标题和滑块的高度
+        width: newWidth,
+        height: newHeight,
       });
     });
 
@@ -57,25 +79,44 @@ export const GlobalView: React.FC<GlobalViewProps> = () => {
   useEffect(() => {
     const loadData = async () => {
       try {
+        setLoading(true);
+        setError(null);
         console.log('开始加载数据...');
-        const response = await fetch('/api/steady-state-data')
-          .then((res) => {
-            if (!res.ok) {
-              throw new Error(`HTTP error! status: ${res.status}`);
-            }
-            return res.text();
-          })
-          .then((text) => d3.csvParse(text));
+
+        const response = await fetch('/api/steady-state-data');
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const text = await response.text();
+        console.log('获取到原始数据，长度:', text.length);
+        const csvData = d3.csvParse(text);
+        console.log('CSV解析完成，行数:', csvData.length);
 
         // 按稳态区间编号分组并处理数据
-        const groupedData = d3.group(response, (d) => d.稳态区间编号);
+        const groupedData = d3.group(csvData, (d) => d.稳态区间编号);
+        console.log('数据分组完成，组数:', groupedData.size);
+
         const processedData = Array.from(groupedData)
           .map(([id, group]) => {
-            if (id === 'null' || id === '0') return null;
+            if (id === 'null' || id === '0') {
+              console.log(`跳过无效区间 ${id}`);
+              return null;
+            }
 
             const times = group.map((d) => new Date(d.时间));
             const loads = group.map((d) => +d.机组负荷);
             const heatRates = group.map((d) => +d.修正后热耗率q);
+
+            // 验证数据有效性
+            if (
+              times.some((t) => isNaN(t.getTime())) ||
+              loads.some(isNaN) ||
+              heatRates.some(isNaN)
+            ) {
+              console.warn(`区间 ${id} 包含无效数据`);
+              return null;
+            }
 
             return {
               区间编号: +id,
@@ -86,17 +127,24 @@ export const GlobalView: React.FC<GlobalViewProps> = () => {
               color: d3.interpolateRdYlGn((10000 - d3.mean(heatRates)!) / 2000),
             };
           })
-          .filter((d) => d !== null);
+          .filter((d): d is ProcessedData => d !== null);
+
+        if (processedData.length === 0) {
+          throw new Error('没有找到有效的稳态区间数据');
+        }
 
         // 计算热耗率的范围
         const heatRateExtent = d3.extent(processedData, (d) => d.平均热耗率) as [number, number];
+        console.log('热耗率范围:', heatRateExtent);
 
         console.log('数据处理完成，稳态区间数:', processedData.length);
-        setData(processedData as any);
-        // 设置初始热耗率范围
+        setData(processedData);
         setHeatRateRange(heatRateExtent);
       } catch (error) {
         console.error('数据加载失败:', error);
+        setError(error instanceof Error ? error.message : '数据加载失败');
+      } finally {
+        setLoading(false);
       }
     };
 
@@ -105,14 +153,36 @@ export const GlobalView: React.FC<GlobalViewProps> = () => {
 
   // 绘制图表
   useEffect(() => {
-    if (!data.length || !svgRef.current) return;
+    console.log('开始绘制图表...', {
+      数据长度: data.length,
+      SVG状态: svgRef.current ? '已就绪' : '未就绪',
+      容器尺寸: dimensions,
+    });
+
+    // 仅检查必要条件
+    if (!data.length || !svgRef.current) {
+      console.log('跳过绘制：数据为空或SVG未准备好');
+      return;
+    }
+
+    if (dimensions.width === 0 || dimensions.height === 0) {
+      console.log('跳过绘制：容器尺寸未就绪');
+      return;
+    }
 
     const innerWidth = dimensions.width * timeScale - margin.left - margin.right;
     const innerHeight = dimensions.height - margin.top - margin.bottom;
+    console.log('图表内部尺寸:', { innerWidth, innerHeight });
+
+    if (innerWidth <= 0 || innerHeight <= 0) {
+      console.log('跳过绘制：内部尺寸无效');
+      return;
+    }
 
     const filteredData = data.filter(
       (d) => d.平均热耗率 >= heatRateRange[0] && d.平均热耗率 <= heatRateRange[1]
     );
+    console.log('过滤后的数据点数:', filteredData.length);
 
     // 清除旧的内容
     d3.select(svgRef.current).selectAll('*').remove();
@@ -127,8 +197,9 @@ export const GlobalView: React.FC<GlobalViewProps> = () => {
       Date,
       Date,
     ];
-    const xScale = d3.scaleTime().domain(timeExtent).range([0, innerWidth]);
+    console.log('时间范围:', timeExtent);
 
+    const xScale = d3.scaleTime().domain(timeExtent).range([0, innerWidth]);
     const yScale = d3.scaleLinear().domain([200, 800]).range([innerHeight, 0]);
 
     // 添加坐标轴
@@ -141,7 +212,7 @@ export const GlobalView: React.FC<GlobalViewProps> = () => {
     svg.append('g').attr('class', 'y-axis').call(d3.axisLeft(yScale));
 
     // 绘制区间
-    svg
+    const rects = svg
       .selectAll('rect')
       .data(filteredData)
       .join('rect')
@@ -175,9 +246,34 @@ export const GlobalView: React.FC<GlobalViewProps> = () => {
         }
       })
       .on('click', (event, d) => {
-        navigate(`/detail/${d.区间编号}`);
+        // 使用 event.preventDefault() 防止事件冒泡
+        event.preventDefault();
+        event.stopPropagation();
+
+        // 添加延时跳转，避免可能的渲染问题
+        setTimeout(() => {
+          navigate(`/detail/${d.区间编号}`);
+        }, 0);
       });
+
+    console.log('绘制完成，矩形数量:', rects.size());
   }, [data, dimensions, heatRateRange, timeScale, navigate]);
+
+  if (loading) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
+        <CircularProgress />
+      </Box>
+    );
+  }
+
+  if (error) {
+    return (
+      <Box sx={{ p: 2 }}>
+        <Alert severity="error">{error}</Alert>
+      </Box>
+    );
+  }
 
   return (
     <Box
@@ -191,6 +287,8 @@ export const GlobalView: React.FC<GlobalViewProps> = () => {
         minHeight: '400px',
         position: 'relative',
         flex: 1,
+        boxSizing: 'border-box',
+        overflow: 'hidden', // 防止内容溢出
       }}
     >
       <Typography variant="h5" gutterBottom>
@@ -217,6 +315,7 @@ export const GlobalView: React.FC<GlobalViewProps> = () => {
           overflow: 'auto',
           '& svg': {
             minWidth: '100%',
+            minHeight: '300px', // 确保 SVG 有最小高度
           },
           '&::-webkit-scrollbar': {
             height: '12px',
@@ -239,10 +338,10 @@ export const GlobalView: React.FC<GlobalViewProps> = () => {
       >
         <svg
           ref={svgRef}
-          height={dimensions.height}
+          height={dimensions.height || 500} // 提供默认高度
           style={{
             border: '1px solid #ccc',
-            width: `${dimensions.width * timeScale}px`,
+            width: `${dimensions.width * timeScale || 800}px`, // 提供默认宽度
           }}
         >
           <g transform={`translate(${margin.left},${margin.top})`}>{/* 图表内容 */}</g>

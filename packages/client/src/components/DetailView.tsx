@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import * as d3 from 'd3';
 import { Box, Paper, Typography, Grid, CircularProgress } from '@mui/material';
+import React from 'react';
 
 interface DetailViewProps {
   onClose?: () => void;
@@ -42,8 +43,13 @@ const formatValue = (value: number | undefined): string => {
   return value.toFixed(2);
 };
 
-export const DetailView = ({ onClose }: DetailViewProps) => {
+// 使用 React.memo 包装组件
+export const DetailView = React.memo(({ onClose }: DetailViewProps) => {
   const { steadyStateId } = useParams<{ steadyStateId: string }>();
+  // 添加一个缓存标志，防止重复加载同一数据
+  const dataLoadedRef = useRef<boolean>(false);
+  // 添加计数器追踪渲染次数 - 移到组件顶层
+  const renderCountRef = useRef(0);
   const [timeSeriesData, setTimeSeriesData] = useState<TimeSeriesData[]>([]);
   const [stats, setStats] = useState<{ [key: string]: StatInfo }>({});
   const [selectedTimeRange, setSelectedTimeRange] = useState<[Date, Date]>([
@@ -54,8 +60,8 @@ export const DetailView = ({ onClose }: DetailViewProps) => {
   const [error, setError] = useState<string | null>(null);
   const timeSeriesRef = useRef<SVGSVGElement>(null);
 
-  // 关键参数列表
-  const keyParameters = [
+  // 缓存关键参数数组，防止在每次渲染时重新创建
+  const keyParameters = useRef([
     '汽轮机热耗率q',
     '主汽压力',
     '主蒸汽母管温度',
@@ -64,27 +70,40 @@ export const DetailView = ({ onClose }: DetailViewProps) => {
     '中压缸效率',
     '锅炉效率',
     '厂用电率',
-  ];
+  ]).current;
 
   // 数据加载
   useEffect(() => {
-    const loadData = async () => {
+    // 如果数据已加载过，或没有区间ID，跳过加载
+    if (dataLoadedRef.current || !steadyStateId) {
       if (!steadyStateId) {
         setError('未找到稳态区间ID');
         setLoading(false);
-        return;
       }
+      return;
+    }
 
+    // 创建 AbortController 用于取消请求
+    const abortController = new AbortController();
+
+    const loadData = async () => {
       try {
         setLoading(true);
         setError(null);
         console.log('开始加载数据，稳态区间ID:', steadyStateId);
 
-        const response = await fetch('/api/steady-state-data')
-          .then((res) => res.text())
-          .then((text) => d3.csvParse(text));
+        const response = await fetch('/api/steady-state-data', {
+          signal: abortController.signal,
+        });
 
-        const filteredData = response
+        if (!response.ok) {
+          throw new Error(`数据加载失败: ${response.status} ${response.statusText}`);
+        }
+
+        const text = await response.text();
+        const csvData = d3.csvParse(text);
+
+        const filteredData = csvData
           .filter((d) => d.稳态区间编号 && +d.稳态区间编号 === +steadyStateId)
           .map((d) => {
             const requiredFields = [
@@ -99,6 +118,7 @@ export const DetailView = ({ onClose }: DetailViewProps) => {
               '厂用电率',
             ];
 
+            // 检查必需字段是否存在
             const missingFields = requiredFields.filter((field) => !(field in d));
             if (missingFields.length > 0) {
               console.warn('数据中缺少字段:', missingFields);
@@ -106,8 +126,14 @@ export const DetailView = ({ onClose }: DetailViewProps) => {
             }
 
             try {
-              return {
-                时间: new Date(d.时间),
+              const time = new Date(d.时间);
+              if (isNaN(time.getTime())) {
+                console.warn('无效的时间格式:', d.时间);
+                return null;
+              }
+
+              const numericData = {
+                时间: time,
                 汽轮机热耗率q: +d.汽轮机热耗率q,
                 主汽压力: +d.主汽压力,
                 主蒸汽母管温度: +d.主蒸汽母管温度,
@@ -117,6 +143,18 @@ export const DetailView = ({ onClose }: DetailViewProps) => {
                 锅炉效率: +d.锅炉效率,
                 厂用电率: +d.厂用电率,
               };
+
+              // 验证所有数值字段
+              const hasInvalidValue = Object.entries(numericData).some(
+                ([key, value]) => key !== '时间' && (isNaN(value) || !isFinite(value))
+              );
+
+              if (hasInvalidValue) {
+                console.warn('数据点包含无效值:', d);
+                return null;
+              }
+
+              return numericData;
             } catch (e) {
               console.error('数据转换错误:', e);
               return null;
@@ -125,16 +163,15 @@ export const DetailView = ({ onClose }: DetailViewProps) => {
           .filter((d): d is TimeSeriesData => d !== null);
 
         if (filteredData.length === 0) {
-          setError(`未找到稳态区间 ${steadyStateId} 的数据`);
-          setLoading(false);
-          return;
+          throw new Error(`未找到稳态区间 ${steadyStateId} 的有效数据`);
         }
 
         console.log('找到数据点数:', filteredData.length);
 
+        // 计算统计信息
         const statsData: { [key: string]: StatInfo } = {};
         keyParameters.forEach((param) => {
-          const values = filteredData.map((d) => d[param] as number).filter(isValidNumber); // 过滤掉无效值
+          const values = filteredData.map((d) => d[param] as number).filter(isValidNumber);
 
           if (values.length === 0) {
             statsData[param] = {
@@ -163,25 +200,56 @@ export const DetailView = ({ onClose }: DetailViewProps) => {
           d3.min(filteredData, (d) => d.时间) as Date,
           d3.max(filteredData, (d) => d.时间) as Date,
         ]);
+
+        // 标记数据已加载
+        dataLoadedRef.current = true;
       } catch (error) {
+        // 判断是否是取消请求导致的错误
+        if ((error as any).name === 'AbortError') {
+          console.log('请求被取消');
+          return;
+        }
+
         console.error('数据加载失败:', error);
-        setError('数据加载失败，请稍后重试');
+        setError(error instanceof Error ? error.message : '数据加载失败，请稍后重试');
       } finally {
         setLoading(false);
       }
     };
 
     loadData();
-  }, [steadyStateId]);
 
-  // 图表渲染
+    // 清理函数：取消未完成的请求
+    return () => {
+      abortController.abort();
+    };
+  }, [steadyStateId, keyParameters]);
+
+  // 绘图函数
   useEffect(() => {
     if (!timeSeriesData.length || !timeSeriesRef.current) return;
+
+    // 增加渲染计数
+    renderCountRef.current += 1;
+    console.log(`图表渲染第 ${renderCountRef.current} 次`);
+
+    // 如果渲染次数过多，可能有循环问题，跳过渲染
+    if (renderCountRef.current > 5) {
+      console.warn('检测到过多渲染次数，跳过本次渲染');
+      return;
+    }
 
     const svg = timeSeriesRef.current;
     const margin = { top: 20, right: 30, bottom: 30, left: 60 };
     const width = svg.clientWidth;
     const height = svg.clientHeight;
+
+    // 如果 SVG 尺寸为零，跳过渲染
+    if (width === 0 || height === 0) {
+      console.log('SVG 尺寸无效，跳过渲染');
+      return;
+    }
+
     const innerWidth = width - margin.left - margin.right;
     const innerHeight = height - margin.top - margin.bottom;
 
@@ -199,6 +267,27 @@ export const DetailView = ({ onClose }: DetailViewProps) => {
 
     // 为每个参数创建一个子图
     const subPlotHeight = innerHeight / keyParameters.length;
+
+    // 创建一个容器来存储所有的提示框，而不是为每个图表创建新的提示框
+    const tooltipId = 'detail-view-tooltip';
+    let tooltip = d3.select(`#${tooltipId}`);
+
+    // 如果提示框不存在，创建一个新的
+    if (tooltip.empty()) {
+      tooltip = d3
+        .select('body')
+        .append('div')
+        .attr('id', tooltipId)
+        .attr('class', 'tooltip')
+        .style('position', 'absolute')
+        .style('visibility', 'hidden')
+        .style('background-color', 'rgba(0,0,0,0.8)')
+        .style('color', 'white')
+        .style('padding', '5px')
+        .style('border-radius', '4px')
+        .style('font-size', '12px')
+        .style('z-index', '9999');
+    }
 
     keyParameters.forEach((param, i) => {
       // 过滤出有效的数据点
@@ -282,19 +371,7 @@ export const DetailView = ({ onClose }: DetailViewProps) => {
         .attr('fill', '#1976d2')
         .attr('opacity', 0.6);
 
-      // 添加悬停效果
-      const tooltip = d3
-        .select('body')
-        .append('div')
-        .attr('class', 'tooltip')
-        .style('position', 'absolute')
-        .style('visibility', 'hidden')
-        .style('background-color', 'rgba(0,0,0,0.8)')
-        .style('color', 'white')
-        .style('padding', '5px')
-        .style('border-radius', '4px')
-        .style('font-size', '12px');
-
+      // 修改悬停效果代码，使用单个提示框而不是为每个图表创建新提示框
       svgG
         .selectAll(`.dot-${i}`)
         .on('mouseover', function (event: MouseEvent, d: unknown) {
@@ -323,6 +400,13 @@ export const DetailView = ({ onClose }: DetailViewProps) => {
           .ticks(5)
           .tickFormat((d) => d3.timeFormat('%m-%d %H:%M')(d as Date))
       );
+
+    // 清理函数
+    return () => {
+      d3.select(svg).selectAll('*').remove();
+      // 重置而不是删除提示框
+      d3.select('#detail-view-tooltip').style('visibility', 'hidden');
+    };
   }, [timeSeriesData, selectedTimeRange, keyParameters]);
 
   // 渲染统计信息卡片
@@ -518,6 +602,22 @@ export const DetailView = ({ onClose }: DetailViewProps) => {
           ))}
         </Grid>
       </Paper>
+
+      {/* 添加固定的提示框元素 */}
+      <div
+        id="detail-view-tooltip"
+        style={{
+          position: 'absolute',
+          display: 'none',
+          backgroundColor: 'rgba(0,0,0,0.8)',
+          color: 'white',
+          padding: '5px',
+          borderRadius: '4px',
+          fontSize: '12px',
+          zIndex: 9999,
+          pointerEvents: 'none',
+        }}
+      />
     </Box>
   );
-};
+});

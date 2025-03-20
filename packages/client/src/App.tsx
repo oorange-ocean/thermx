@@ -38,7 +38,10 @@ function App() {
             <Routes>
               <Route path="/" element={<GlobalView />} />
               <Route path="/local" element={<LocalView />} />
-              <Route path="/detail/:steadyStateId" element={<DetailView />} />
+              <Route
+                path="/detail/:steadyStateId"
+                element={<DetailView key={window.location.pathname} />}
+              />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
           </MainLayout>
