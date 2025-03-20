@@ -48,9 +48,71 @@ export const LocalView = () => {
         setLoading(true);
         setLoadingProgress(0);
 
-        // 加载原始数据
-        const [clusteringResponse, steadyStateResponse] = await Promise.all([
-          fetch(`${API_BASE_URL}/clustering-data`).then(async (response) => {
+        // 检查是否有已处理的缓存数据
+        const cachedData = await dbCache.get<ClusteringData[]>('localViewData');
+        if (cachedData) {
+          // 比较新处理的数据与缓存数据的哈希
+          console.log('使用缓存的局部视图数据');
+          setData(cachedData);
+          setLoading(false);
+          setLoadingProgress(100);
+          return;
+        }
+
+        // 分开处理聚类数据和稳态数据
+        // 对于稳态数据，先检查是否有原始数据缓存
+        let steadyStateResponse;
+        const cachedRawData = await dbCache.getRawSteadyStateData<string>();
+
+        if (cachedRawData) {
+          console.log('使用缓存的原始稳态数据');
+          steadyStateResponse = d3.csvParse(
+            cachedRawData
+          ) as unknown as DSVParsedArray<SteadyStateData>;
+          setLoadingProgress(50); // 跳过稳态数据的下载进度
+        } else {
+          // 没有缓存，需要从服务器加载
+          steadyStateResponse = await fetch(`${API_BASE_URL}/steady-state-data`).then(
+            async (response) => {
+              // 读取总长度
+              const contentLength = response.headers.get('Content-Length');
+              const total = contentLength ? parseInt(contentLength, 10) : 0;
+              let loaded = 0;
+
+              const reader = response.body!.getReader();
+              const chunks: Uint8Array[] = [];
+
+              while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                chunks.push(value);
+                loaded += value.length;
+
+                if (total) {
+                  const progress = Math.round((loaded / total) * 40); // 最多占总进度的40%
+                  setLoadingProgress(50 + progress);
+                }
+              }
+
+              const allChunks = new Uint8Array(loaded);
+              let position = 0;
+              for (const chunk of chunks) {
+                allChunks.set(chunk, position);
+                position += chunk.length;
+              }
+
+              const text = new TextDecoder().decode(allChunks);
+              // 同时缓存原始数据供其他视图使用
+              await dbCache.saveRawSteadyStateData(text);
+              return d3.csvParse(text) as unknown as DSVParsedArray<SteadyStateData>;
+            }
+          );
+        }
+
+        // 仍然需要加载聚类数据
+        const clusteringResponse = await fetch(`${API_BASE_URL}/clustering-data`).then(
+          async (response) => {
             // 读取总长度
             const contentLength = response.headers.get('Content-Length');
             const total = contentLength ? parseInt(contentLength, 10) : 0;
@@ -71,7 +133,7 @@ export const LocalView = () => {
               // 更新加载进度
               if (total) {
                 const progress = Math.round((loaded / total) * 40); // 最多占总进度的40%
-                setLoadingProgress(10 + progress);
+                setLoadingProgress(90 + progress);
               }
             }
 
@@ -86,40 +148,8 @@ export const LocalView = () => {
             // 解码为文本并解析CSV
             const text = new TextDecoder().decode(allChunks);
             return d3.csvParse(text) as unknown as DSVParsedArray<ClusteringRawData>;
-          }),
-          fetch(`${API_BASE_URL}/steady-state-data`).then(async (response) => {
-            // 读取总长度
-            const contentLength = response.headers.get('Content-Length');
-            const total = contentLength ? parseInt(contentLength, 10) : 0;
-            let loaded = 0;
-
-            const reader = response.body!.getReader();
-            const chunks: Uint8Array[] = [];
-
-            while (true) {
-              const { done, value } = await reader.read();
-              if (done) break;
-
-              chunks.push(value);
-              loaded += value.length;
-
-              if (total) {
-                const progress = Math.round((loaded / total) * 40); // 最多占总进度的40%
-                setLoadingProgress(50 + progress);
-              }
-            }
-
-            const allChunks = new Uint8Array(loaded);
-            let position = 0;
-            for (const chunk of chunks) {
-              allChunks.set(chunk, position);
-              position += chunk.length;
-            }
-
-            const text = new TextDecoder().decode(allChunks);
-            return d3.csvParse(text) as unknown as DSVParsedArray<SteadyStateData>;
-          }),
-        ]);
+          }
+        );
 
         // 首先处理稳态数据，创建一个映射表
         const steadyStateMap = new Map(
@@ -169,14 +199,14 @@ export const LocalView = () => {
         setLoadingProgress(90);
 
         // 检查缓存数据是否存在，如果存在则比较哈希
-        const cachedData = await dbCache.get<ClusteringData[]>('localViewData');
-        if (cachedData) {
+        const existingCachedData = await dbCache.get<ClusteringData[]>('localViewData');
+        if (existingCachedData) {
           // 比较新处理的数据与缓存数据的哈希
           const hashMatch = await dbCache.compareHash('localViewData', processedData);
           if (hashMatch) {
             // 哈希匹配，使用缓存数据
             console.log('缓存数据哈希匹配，使用缓存');
-            setData(cachedData);
+            setData(existingCachedData);
             setLoading(false);
             setLoadingProgress(100);
             return;

@@ -82,7 +82,7 @@ export const GlobalView: React.FC<GlobalViewProps> = () => {
         setError(null);
         setLoadingProgress(0);
 
-        // 尝试从IndexedDB缓存获取数据
+        // 检查是否有已处理的缓存数据
         const cachedData = await dbCache.get<ProcessedData[]>('globalViewData');
         if (cachedData) {
           console.log('使用缓存数据，总数:', cachedData.length);
@@ -94,49 +94,63 @@ export const GlobalView: React.FC<GlobalViewProps> = () => {
         setLoadingProgress(10);
         console.log(`API_BASE_URL: ${API_BASE_URL}`);
 
-        // 带进度的数据加载
-        const response = await fetch(`${API_BASE_URL}/steady-state-data`);
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
+        // 检查是否有原始数据缓存
+        let csvData;
+        const cachedRawData = await dbCache.getRawSteadyStateData<string>();
 
-        // 读取总长度
-        const contentLength = response.headers.get('Content-Length');
-        const total = contentLength ? parseInt(contentLength, 10) : 0;
-        let loaded = 0;
-
-        // 创建响应流读取器
-        const reader = response.body!.getReader();
-        const chunks: Uint8Array[] = [];
-
-        // 读取数据块
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-
-          chunks.push(value);
-          loaded += value.length;
-
-          // 更新加载进度
-          if (total) {
-            const progress = Math.round((loaded / total) * 80); // 最多占总进度的80%
-            setLoadingProgress(10 + progress);
+        if (cachedRawData) {
+          console.log('使用缓存的原始稳态数据');
+          csvData = d3.csvParse(cachedRawData);
+          setLoadingProgress(90); // 跳过下载进度
+        } else {
+          // 没有缓存，从服务器加载原始数据
+          // 带进度的数据加载
+          const response = await fetch(`${API_BASE_URL}/steady-state-data`);
+          if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
           }
+
+          // 读取总长度
+          const contentLength = response.headers.get('Content-Length');
+          const total = contentLength ? parseInt(contentLength, 10) : 0;
+          let loaded = 0;
+
+          // 创建响应流读取器
+          const reader = response.body!.getReader();
+          const chunks: Uint8Array[] = [];
+
+          // 读取数据块
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            chunks.push(value);
+            loaded += value.length;
+
+            // 更新加载进度
+            if (total) {
+              const progress = Math.round((loaded / total) * 80); // 最多占总进度的80%
+              setLoadingProgress(10 + progress);
+            }
+          }
+
+          // 合并所有数据块
+          const allChunks = new Uint8Array(loaded);
+          let position = 0;
+          for (const chunk of chunks) {
+            allChunks.set(chunk, position);
+            position += chunk.length;
+          }
+
+          // 解码为文本并解析CSV
+          const text = new TextDecoder().decode(allChunks);
+
+          // 缓存原始CSV文本数据，供其他视图使用
+          await dbCache.saveRawSteadyStateData(text);
+
+          csvData = d3.csvParse(text);
+          setLoadingProgress(90);
         }
-
-        // 合并所有数据块
-        const allChunks = new Uint8Array(loaded);
-        let position = 0;
-        for (const chunk of chunks) {
-          allChunks.set(chunk, position);
-          position += chunk.length;
-        }
-
-        // 解码为文本并解析CSV
-        const text = new TextDecoder().decode(allChunks);
-        const csvData = d3.csvParse(text);
-
-        setLoadingProgress(90);
 
         // 按稳态区间编号分组并处理数据
         const groupedData = d3.group(csvData, (d) => d.稳态区间编号);

@@ -4,6 +4,7 @@ import * as d3 from 'd3';
 import { Box, Paper, Typography, Grid, CircularProgress } from '@mui/material';
 import React from 'react';
 import { API_BASE_URL } from '../config';
+import { dbCache } from '../utils/indexedDBCache';
 
 interface DetailViewProps {
   onClose?: () => void;
@@ -93,16 +94,28 @@ export const DetailView = React.memo(({ onClose }: DetailViewProps) => {
         setError(null);
         console.log('开始加载数据，稳态区间ID:', steadyStateId);
 
-        const response = await fetch(`${API_BASE_URL}/steady-state-data`, {
-          signal: abortController.signal,
-        });
+        // 先检查是否有原始数据缓存
+        let csvData;
+        const cachedRawData = await dbCache.getRawSteadyStateData<string>();
 
-        if (!response.ok) {
-          throw new Error(`数据加载失败: ${response.status} ${response.statusText}`);
+        if (cachedRawData) {
+          console.log('使用缓存的原始稳态数据');
+          csvData = d3.csvParse(cachedRawData);
+        } else {
+          // 没有缓存，从服务器加载
+          const response = await fetch(`${API_BASE_URL}/steady-state-data`, {
+            signal: abortController.signal,
+          });
+
+          if (!response.ok) {
+            throw new Error(`数据加载失败: ${response.status} ${response.statusText}`);
+          }
+
+          const text = await response.text();
+          // 缓存原始数据供其他视图使用
+          await dbCache.saveRawSteadyStateData(text);
+          csvData = d3.csvParse(text);
         }
-
-        const text = await response.text();
-        const csvData = d3.csvParse(text);
 
         const filteredData = csvData
           .filter((d) => d.稳态区间编号 && +d.稳态区间编号 === +steadyStateId)

@@ -27,6 +27,9 @@ class IndexedDBCache {
     expireTime: 60 * 60 * 1000, // 默认1小时
   };
 
+  // 添加用于存储原始数据的缓存键名
+  private readonly RAW_DATA_CACHE_KEY = 'rawSteadyStateData';
+
   constructor() {
     this.dbReady = this.initDB();
   }
@@ -369,6 +372,32 @@ class IndexedDBCache {
         reject(error);
       }
     });
+  }
+
+  /**
+   * 保存原始稳态数据到缓存
+   * @param data 要缓存的原始CSV数据
+   * @param options 缓存选项
+   */
+  async saveRawSteadyStateData<T>(data: T, options?: CacheOptions): Promise<void> {
+    return this.set(this.RAW_DATA_CACHE_KEY, data, options);
+  }
+
+  /**
+   * 获取原始稳态数据
+   * @returns 缓存的原始数据，如果已过期或不存在则返回null
+   */
+  async getRawSteadyStateData<T>(): Promise<T | null> {
+    return this.get<T>(this.RAW_DATA_CACHE_KEY);
+  }
+
+  /**
+   * 检查原始稳态数据是否已缓存
+   * @returns 如果已缓存且未过期返回true
+   */
+  async hasRawSteadyStateData(): Promise<boolean> {
+    const metadata = await this.getMetadata(this.RAW_DATA_CACHE_KEY);
+    return metadata !== null;
   }
 }
 
