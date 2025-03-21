@@ -94,6 +94,17 @@ export const DetailView = React.memo(({ onClose }: DetailViewProps) => {
         setError(null);
         console.log('开始加载数据，稳态区间ID:', steadyStateId);
 
+        // 获取稳态数据元数据
+        const metadataResponse = await fetch(`${API_BASE_URL}/steady-state-data-metadata`, {
+          signal: abortController.signal,
+        });
+
+        if (!metadataResponse.ok) {
+          throw new Error('无法获取数据元数据');
+        }
+
+        const metadata = await metadataResponse.json();
+
         // 先检查是否有原始数据缓存
         let csvData;
         const cachedRawData = await dbCache.getRawSteadyStateData<string>();
@@ -102,24 +113,59 @@ export const DetailView = React.memo(({ onClose }: DetailViewProps) => {
           console.log('使用缓存的原始稳态数据');
           csvData = d3.csvParse(cachedRawData);
         } else {
-          // 没有缓存，从服务器加载
-          const response = await fetch(`${API_BASE_URL}/steady-state-data`, {
-            signal: abortController.signal,
-          });
+          // 没有缓存，分块加载数据
+          const { totalChunks } = metadata;
+          const allData: any[] = [];
 
-          if (!response.ok) {
-            throw new Error(`数据加载失败: ${response.status} ${response.statusText}`);
+          // 逐块加载数据
+          for (let i = 0; i < totalChunks; i++) {
+            const chunkResponse = await fetch(`${API_BASE_URL}/steady-state-data/${i}`, {
+              signal: abortController.signal,
+            });
+
+            if (!chunkResponse.ok) {
+              throw new Error(`无法获取数据分片 ${i}`);
+            }
+
+            const chunkData = await chunkResponse.json();
+
+            // 检查这个区块是否包含我们需要的稳态区间数据
+            const hasTargetData = chunkData.some(
+              (d: any) => d.稳态区间编号 && +d.稳态区间编号 === +steadyStateId
+            );
+
+            // 如果找到目标数据，立即处理并显示
+            if (hasTargetData) {
+              const relevantData = chunkData.filter(
+                (d: any) => d.稳态区间编号 && +d.稳态区间编号 === +steadyStateId
+              );
+
+              console.log(`在分片 ${i} 中找到相关数据点: ${relevantData.length} 条`);
+
+              // 开始处理数据并显示
+              processAndDisplayData(relevantData);
+            }
+
+            // 收集所有数据用于缓存
+            allData.push(...chunkData);
+
+            // 每加载几个分片后，让出主线程
+            if (i % 3 === 2) {
+              await new Promise((resolve) => setTimeout(resolve, 0));
+            }
           }
 
-          const text = await response.text();
-          // 缓存原始数据供其他视图使用
-          await dbCache.saveRawSteadyStateData(text);
-          csvData = d3.csvParse(text);
+          // 将完整数据缓存
+          const rawData = d3.csvFormat(allData);
+          await dbCache.saveRawSteadyStateData(rawData);
+
+          csvData = allData;
         }
 
+        // 过滤和处理数据
         const filteredData = csvData
-          .filter((d) => d.稳态区间编号 && +d.稳态区间编号 === +steadyStateId)
-          .map((d) => {
+          .filter((d: any) => d.稳态区间编号 && +d.稳态区间编号 === +steadyStateId)
+          .map((d: any) => {
             const requiredFields = [
               '时间',
               '汽轮机热耗率q',
@@ -229,6 +275,95 @@ export const DetailView = React.memo(({ onClose }: DetailViewProps) => {
         setError(error instanceof Error ? error.message : '数据加载失败，请稍后重试');
       } finally {
         setLoading(false);
+      }
+    };
+
+    // 辅助函数：处理并显示数据
+    const processAndDisplayData = (dataPoints: any[]) => {
+      const processedData = dataPoints
+        .map((d) => {
+          const requiredFields = [
+            '时间',
+            '汽轮机热耗率q',
+            '主汽压力',
+            '主蒸汽母管温度',
+            '再热汽母管温度',
+            '高压缸效率',
+            '中压缸效率',
+            '锅炉效率',
+            '厂用电率',
+          ];
+
+          // 检查必需字段是否存在
+          const missingFields = requiredFields.filter((field) => !(field in d));
+          if (missingFields.length > 0) {
+            console.warn('数据中缺少字段:', missingFields);
+            return null;
+          }
+
+          try {
+            const time = new Date(d.时间);
+            if (isNaN(time.getTime())) {
+              console.warn('无效的时间格式:', d.时间);
+              return null;
+            }
+
+            const numericData = {
+              时间: time,
+              汽轮机热耗率q: +d.汽轮机热耗率q,
+              主汽压力: +d.主汽压力,
+              主蒸汽母管温度: +d.主蒸汽母管温度,
+              再热汽母管温度: +d.再热汽母管温度,
+              高压缸效率: +d.高压缸效率,
+              中压缸效率: +d.中压缸效率,
+              锅炉效率: +d.锅炉效率,
+              厂用电率: +d.厂用电率,
+            };
+
+            // 验证所有数值字段
+            const hasInvalidValue = Object.entries(numericData).some(
+              ([key, value]) =>
+                key !== '时间' && typeof value === 'number' && (isNaN(value) || !isFinite(value))
+            );
+
+            if (hasInvalidValue) {
+              console.warn('数据点包含无效值:', d);
+              return null;
+            }
+
+            return numericData;
+          } catch (e) {
+            console.error('数据转换错误:', e);
+            return null;
+          }
+        })
+        .filter((d): d is TimeSeriesData => d !== null);
+
+      // 计算初步统计信息并更新界面
+      if (processedData.length > 0) {
+        setTimeSeriesData(processedData);
+
+        // 计算初步统计信息
+        const initialStats: { [key: string]: StatInfo } = {};
+        keyParameters.forEach((param) => {
+          const values = processedData.map((d) => d[param] as number).filter(isValidNumber);
+
+          initialStats[param] = {
+            mean: values.length ? d3.mean(values) || 0 : 0,
+            std: values.length ? d3.deviation(values) || 0 : 0,
+            min: values.length ? d3.min(values) || 0 : 0,
+            max: values.length ? d3.max(values) || 0 : 0,
+            validCount: values.length,
+            totalCount: processedData.length,
+          };
+        });
+
+        setStats(initialStats);
+
+        setSelectedTimeRange([
+          d3.min(processedData, (d) => d.时间) as Date,
+          d3.max(processedData, (d) => d.时间) as Date,
+        ]);
       }
     };
 

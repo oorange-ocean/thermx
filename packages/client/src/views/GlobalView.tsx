@@ -91,128 +91,111 @@ export const GlobalView: React.FC<GlobalViewProps> = () => {
           return;
         }
 
-        setLoadingProgress(10);
-        console.log(`API_BASE_URL: ${API_BASE_URL}`);
+        // 获取稳态数据元数据
+        console.log('获取稳态数据元数据');
+        const metadataResponse = await fetch(`${API_BASE_URL}/steady-state-data-metadata`);
+        if (!metadataResponse.ok) {
+          throw new Error('无法获取数据元数据');
+        }
 
-        // 检查是否有原始数据缓存
-        let csvData;
+        const metadata = await metadataResponse.json();
+        const { totalChunks, totalRecords } = metadata;
+        setLoadingProgress(10);
+
+        // 尝试从缓存获取数据
+        let csvData: any[] = [];
         const cachedRawData = await dbCache.getRawSteadyStateData<string>();
 
         if (cachedRawData) {
+          // 使用缓存
           console.log('使用缓存的原始稳态数据');
           csvData = d3.csvParse(cachedRawData);
-          setLoadingProgress(90); // 跳过下载进度
+          setLoadingProgress(90);
         } else {
-          // 没有缓存，从服务器加载原始数据
-          // 带进度的数据加载
-          const response = await fetch(`${API_BASE_URL}/steady-state-data`);
-          if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-          }
+          // 分批加载稳态数据
+          for (let i = 0; i < totalChunks; i++) {
+            console.log(`加载稳态数据分片 ${i + 1}/${totalChunks}`);
+            const chunkResponse = await fetch(`${API_BASE_URL}/steady-state-data/${i}`);
+            if (!chunkResponse.ok) {
+              throw new Error(`无法获取数据分片 ${i}`);
+            }
 
-          // 读取总长度
-          const contentLength = response.headers.get('Content-Length');
-          const total = contentLength ? parseInt(contentLength, 10) : 0;
-          let loaded = 0;
+            const chunkData = await chunkResponse.json();
+            csvData = [...csvData, ...chunkData];
 
-          // 创建响应流读取器
-          const reader = response.body!.getReader();
-          const chunks: Uint8Array[] = [];
+            // 更新进度
+            const progress = Math.round(10 + ((i + 1) / totalChunks) * 80);
+            setLoadingProgress(progress);
 
-          // 读取数据块
-          while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-
-            chunks.push(value);
-            loaded += value.length;
-
-            // 更新加载进度
-            if (total) {
-              const progress = Math.round((loaded / total) * 80); // 最多占总进度的80%
-              setLoadingProgress(10 + progress);
+            // 每加载3个分片后，让出主线程
+            if (i % 3 === 2) {
+              await new Promise((resolve) => setTimeout(resolve, 0));
             }
           }
 
-          // 合并所有数据块
-          const allChunks = new Uint8Array(loaded);
-          let position = 0;
-          for (const chunk of chunks) {
-            allChunks.set(chunk, position);
-            position += chunk.length;
-          }
-
-          // 解码为文本并解析CSV
-          const text = new TextDecoder().decode(allChunks);
-
-          // 缓存原始CSV文本数据，供其他视图使用
-          await dbCache.saveRawSteadyStateData(text);
-
-          csvData = d3.csvParse(text);
-          setLoadingProgress(90);
+          // 将完整数据缓存
+          const rawData = d3.csvFormat(csvData);
+          await dbCache.saveRawSteadyStateData(rawData);
         }
 
         // 按稳态区间编号分组并处理数据
-        const groupedData = d3.group(csvData, (d) => d.稳态区间编号);
+        const groupedData = d3.group(csvData, (d: any) => d.稳态区间编号);
 
-        const processedData = Array.from(groupedData)
-          .map(([id, group]) => {
-            if (id === 'null' || id === '0') {
-              return null;
-            }
+        // 增量处理分批数据
+        const processedData: ProcessedData[] = [];
+        let processedCount = 0;
+        const groupEntries = Array.from(groupedData.entries());
+        const batchSize = 50; // 每批处理50个区间
 
-            const times = group.map((d) => new Date(d.时间));
-            const loads = group.map((d) => +d.机组负荷);
-            const heatRates = group.map((d) => +d.修正后热耗率q);
+        for (let i = 0; i < groupEntries.length; i += batchSize) {
+          const batch = groupEntries.slice(i, i + batchSize);
 
-            // 验证数据有效性
-            if (
-              times.some((t) => isNaN(t.getTime())) ||
-              loads.some(isNaN) ||
-              heatRates.some(isNaN)
-            ) {
-              console.warn(`区间 ${id} 包含无效数据`);
-              return null;
-            }
+          const batchProcessed = batch
+            .map(([id, group]) => {
+              if (id === 'null' || id === '0') {
+                return null;
+              }
 
-            return {
-              区间编号: +id,
-              开始时间: d3.min(times)!,
-              结束时间: d3.max(times)!,
-              平均负荷: d3.mean(loads)!,
-              平均热耗率: d3.mean(heatRates)!,
-              color: d3.interpolateRdYlGn((10000 - d3.mean(heatRates)!) / 2000),
-            };
-          })
-          .filter((d): d is ProcessedData => d !== null);
+              const times = group.map((d: any) => new Date(d.时间));
+              const loads = group.map((d: any) => +d.机组负荷);
+              const heatRates = group.map((d: any) => +d.修正后热耗率q);
 
-        if (processedData.length === 0) {
-          throw new Error('没有找到有效的稳态区间数据');
-        }
+              // 验证数据有效性
+              if (
+                times.some((t) => isNaN(t.getTime())) ||
+                loads.some(isNaN) ||
+                heatRates.some(isNaN)
+              ) {
+                console.warn(`区间 ${id} 包含无效数据`);
+                return null;
+              }
 
-        // 检查缓存数据是否存在，如果存在则比较哈希
-        const existingCachedData = await dbCache.get<ProcessedData[]>('globalViewData');
-        if (existingCachedData) {
-          // 比较新处理的数据与缓存数据的哈希
-          const hashMatch = await dbCache.compareHash('globalViewData', processedData);
-          if (hashMatch) {
-            // 哈希匹配，使用缓存数据
-            console.log('缓存数据哈希匹配，使用缓存');
-            setData(existingCachedData);
-            setLoading(false);
-            setLoadingProgress(100);
-            return;
-          } else {
-            console.log('缓存数据哈希不匹配，更新缓存');
+              return {
+                区间编号: +id,
+                开始时间: d3.min(times)!,
+                结束时间: d3.max(times)!,
+                平均负荷: d3.mean(loads)!,
+                平均热耗率: d3.mean(heatRates)!,
+                color: d3.interpolateRdYlGn((10000 - d3.mean(heatRates)!) / 2000),
+              };
+            })
+            .filter((d): d is ProcessedData => d !== null);
+
+          processedData.push(...batchProcessed);
+          processedCount += batchSize;
+
+          // 如果已经处理了足够的数据，开始显示初步结果
+          if (processedData.length >= 100 || i === 0) {
+            setData([...processedData]);
           }
-        } else {
-          console.log('未找到缓存数据，创建新缓存');
+
+          // 让出主线程，保持UI响应
+          await new Promise((resolve) => setTimeout(resolve, 0));
         }
 
-        // 保存到IndexedDB缓存
+        // 缓存处理后的数据
         await dbCache.set('globalViewData', processedData);
         setLoadingProgress(100);
-
         setData(processedData);
       } catch (error) {
         console.error('数据加载失败:', error);

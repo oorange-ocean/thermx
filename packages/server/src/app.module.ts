@@ -3,6 +3,17 @@ import { ServeStaticModule } from '@nestjs/serve-static';
 import { join } from 'path';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
+import { DataChunkingService } from './services/data-chunking.service';
+import { DataChunkingInitializer } from './init/data-chunking.init';
+import { ScheduleModule } from '@nestjs/schedule';
+import { DataChunkingTask } from './tasks/data-chunking.task';
+
+// 为了解决 @nestjs/schedule 中的 crypto.randomUUID 错误
+import * as crypto from 'crypto';
+// @ts-ignore
+global.crypto = global.crypto || {};
+// @ts-ignore
+global.crypto.randomUUID = global.crypto.randomUUID || crypto.randomUUID;
 
 // 根据环境确定静态文件路径
 const getStaticFilePath = () => {
@@ -28,8 +39,14 @@ const getStaticFilePath = () => {
       rootPath: getStaticFilePath(),
       serveRoot: '/public',
     }),
+    ScheduleModule.forRoot(),
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [
+    AppService,
+    DataChunkingService,
+    DataChunkingInitializer,
+    DataChunkingTask,
+  ],
 })
 export class AppModule {}
