@@ -10,6 +10,8 @@ import { dbCache } from '../utils/indexedDBCache';
 interface GlobalViewProps {
   width?: number;
   height?: number;
+  isEmbedded?: boolean;
+  onSteadyStateSelect?: (steadyStateId: number) => void;
 }
 
 // 定义数据类型
@@ -22,7 +24,12 @@ interface ProcessedData {
   color: string;
 }
 
-export const GlobalView: React.FC<GlobalViewProps> = () => {
+export const GlobalView: React.FC<GlobalViewProps> = ({
+  width,
+  height,
+  isEmbedded = false,
+  onSteadyStateSelect,
+}) => {
   const navigate = useNavigate();
 
   // 添加常量定义
@@ -256,7 +263,16 @@ export const GlobalView: React.FC<GlobalViewProps> = () => {
 
     svg.append('g').attr('class', 'y-axis').call(d3.axisLeft(yScale));
 
-    // 绘制区间
+    // 修改点击事件处理
+    const handleSteadyStateClick = (steadyStateId: number) => {
+      if (isEmbedded && onSteadyStateSelect) {
+        onSteadyStateSelect(steadyStateId);
+      } else {
+        navigate(`/detail/${steadyStateId}`);
+      }
+    };
+
+    // 修改矩形的点击事件
     const rects = svg
       .selectAll('rect')
       .data(filteredData)
@@ -291,18 +307,13 @@ export const GlobalView: React.FC<GlobalViewProps> = () => {
         }
       })
       .on('click', (event, d) => {
-        // 使用 event.preventDefault() 防止事件冒泡
         event.preventDefault();
         event.stopPropagation();
-
-        // 添加延时跳转，避免可能的渲染问题
-        setTimeout(() => {
-          navigate(`/detail/${d.区间编号}`);
-        }, 0);
+        handleSteadyStateClick(d.区间编号);
       });
 
     console.log('绘制完成，矩形数量:', rects.size());
-  }, [data, dimensions, heatRateRange, timeScale, navigate]);
+  }, [data, dimensions, heatRateRange, timeScale, navigate, isEmbedded, onSteadyStateSelect]);
 
   if (loading) {
     return (

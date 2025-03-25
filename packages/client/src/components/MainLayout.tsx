@@ -20,6 +20,7 @@ import {
   ChevronLeft as ChevronLeftIcon,
   Timeline as TimelineIcon,
   Analytics as AnalyticsIcon,
+  Dashboard as DashboardIcon,
 } from '@mui/icons-material';
 
 const DRAWER_WIDTH = 240;
@@ -39,7 +40,8 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
   };
 
   const menuItems = [
-    { text: '全局视图', icon: <TimelineIcon />, path: '/' },
+    { text: '整合视图', icon: <DashboardIcon />, path: '/integrated' },
+    { text: '全局视图', icon: <TimelineIcon />, path: '/global' },
     { text: '局部视图', icon: <AnalyticsIcon />, path: '/local' },
   ];
 

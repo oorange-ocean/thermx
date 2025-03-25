@@ -2,7 +2,8 @@ import { CssBaseline, ThemeProvider, createTheme, Box } from '@mui/material';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { GlobalView } from './views/GlobalView';
 import { LocalView } from './views/LocalView';
-import { DetailView } from './components/DetailView';
+import { DetailView } from './views/DetailView';
+import { IntegratedView } from './views/IntegratedView';
 import { MainLayout } from './components/MainLayout';
 
 const theme = createTheme({
@@ -36,13 +37,15 @@ function App() {
         >
           <MainLayout>
             <Routes>
-              <Route path="/" element={<GlobalView />} />
+              <Route path="/" element={<Navigate to="/integrated" replace />} />
+              <Route path="/integrated" element={<IntegratedView />} />
+              <Route path="/global" element={<GlobalView />} />
               <Route path="/local" element={<LocalView />} />
               <Route
                 path="/detail/:steadyStateId"
                 element={<DetailView key={window.location.pathname} />}
               />
-              <Route path="*" element={<Navigate to="/" replace />} />
+              <Route path="*" element={<Navigate to="/integrated" replace />} />
             </Routes>
           </MainLayout>
         </Box>
