@@ -27,7 +27,7 @@ export const IntegratedView = () => {
   const [loading, setLoading] = useState(true);
   const [loadingProgress, setLoadingProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
-  const [selectedSteadyState, setSelectedSteadyState] = useState<number | null>(null);
+  const [selectedSteadyState, setSelectedSteadyState] = useState<number | null>(1);
   const [heatRateRange, setHeatRateRange] = useState<[number, number]>([7000, 10000]);
   const [timeScale, setTimeScale] = useState(12);
 
@@ -134,6 +134,15 @@ export const IntegratedView = () => {
     loadData();
   }, []);
 
+  // 在数据加载完成后，可以设置一个默认的稳态区间
+  useEffect(() => {
+    if (data.length > 0) {
+      // 可以选择第一个区间或者其他特定的区间
+      const defaultSteadyState = data[0]?.区间编号 || 1;
+      setSelectedSteadyState(defaultSteadyState);
+    }
+  }, [data]);
+
   // 处理稳态区间选择
   const handleSteadyStateSelect = (steadyStateId: number) => {
     setSelectedSteadyState(steadyStateId);
@@ -174,7 +183,7 @@ export const IntegratedView = () => {
         <Paper
           elevation={2}
           sx={{
-            p: 2,
+            p: 1,
             display: 'flex',
             flexDirection: 'column',
             height: '50vh',
@@ -184,7 +193,30 @@ export const IntegratedView = () => {
           <Typography variant="subtitle1" gutterBottom>
             稳态负荷区间
           </Typography>
-          <Box sx={{ flex: 1, overflow: 'auto' }}>
+          <Box
+            sx={{
+              flex: 1,
+              overflow: 'auto',
+              '&::-webkit-scrollbar': {
+                height: '8px',
+                width: '8px',
+              },
+              '&::-webkit-scrollbar-track': {
+                background: '#f0f0f0',
+                borderRadius: '4px',
+              },
+              '&::-webkit-scrollbar-thumb': {
+                background: '#bbb',
+                borderRadius: '4px',
+                '&:hover': {
+                  background: '#999',
+                },
+              },
+              '& > div': {
+                padding: '0 2px 2px 2px',
+              },
+            }}
+          >
             <GlobalView
               isEmbedded
               onSteadyStateSelect={handleSteadyStateSelect}
@@ -237,7 +269,7 @@ export const IntegratedView = () => {
                 variant="body2"
                 sx={{ color: 'text.secondary', textAlign: 'center', mt: 2 }}
               >
-                请在上方甘特图中选择一个稳态区间以查看详细信息
+                加载中...
               </Typography>
             )}
           </Box>

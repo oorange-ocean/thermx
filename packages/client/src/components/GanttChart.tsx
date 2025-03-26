@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import * as d3 from 'd3';
+import { Box } from '@mui/material';
 
 interface GanttChartProps {
   data: Array<{
@@ -25,11 +26,12 @@ export const GanttChart: React.FC<GanttChartProps> = ({
   heatRateRange = [7000, 10000],
   onSteadyStateSelect,
 }) => {
-  const svgRef = useRef<SVGSVGElement>(null);
+  const mainChartRef = useRef<SVGSVGElement>(null);
+  const yAxisRef = useRef<SVGSVGElement>(null);
   const margin = { top: 20, right: 30, bottom: 40, left: 50 };
 
   useEffect(() => {
-    if (!data.length || !svgRef.current) return;
+    if (!data.length || !mainChartRef.current || !yAxisRef.current) return;
 
     const innerWidth = width * timeScale - margin.left - margin.right;
     const innerHeight = height - margin.top - margin.bottom;
@@ -41,10 +43,16 @@ export const GanttChart: React.FC<GanttChartProps> = ({
     );
 
     // 清除旧的内容
-    d3.select(svgRef.current).selectAll('*').remove();
+    d3.select(mainChartRef.current).selectAll('*').remove();
+    d3.select(yAxisRef.current).selectAll('*').remove();
 
-    const svg = d3
-      .select(svgRef.current)
+    const mainSvg = d3
+      .select(mainChartRef.current)
+      .append('g')
+      .attr('transform', `translate(0,${margin.top})`);
+
+    const yAxisSvg = d3
+      .select(yAxisRef.current)
       .append('g')
       .attr('transform', `translate(${margin.left},${margin.top})`);
 
@@ -58,16 +66,16 @@ export const GanttChart: React.FC<GanttChartProps> = ({
     const yScale = d3.scaleLinear().domain([200, 800]).range([innerHeight, 0]);
 
     // 添加坐标轴
-    svg
+    mainSvg
       .append('g')
       .attr('class', 'x-axis')
       .attr('transform', `translate(0,${innerHeight})`)
       .call(d3.axisBottom(xScale));
 
-    svg.append('g').attr('class', 'y-axis').call(d3.axisLeft(yScale));
+    yAxisSvg.append('g').attr('class', 'y-axis').call(d3.axisLeft(yScale));
 
     // 绘制矩形
-    svg
+    mainSvg
       .selectAll('rect')
       .data(filteredData)
       .join('rect')
@@ -108,16 +116,51 @@ export const GanttChart: React.FC<GanttChartProps> = ({
   }, [data, width, height, timeScale, heatRateRange, onSteadyStateSelect]);
 
   return (
-    <>
+    <div style={{ display: 'flex', position: 'relative' }}>
       <svg
-        ref={svgRef}
+        ref={yAxisRef}
         height={height}
+        width={margin.left}
         style={{
-          width: `${width * timeScale}px`,
-          minWidth: '100%',
-          minHeight: '300px',
+          position: 'sticky',
+          left: 0,
+          zIndex: 1,
+          backgroundColor: 'white',
         }}
       />
+      <Box
+        sx={{
+          overflowX: 'auto',
+          width: '100%',
+          '&::-webkit-scrollbar': {
+            height: '12px',
+            width: '12px',
+          },
+          '&::-webkit-scrollbar-track': {
+            background: '#f0f0f0',
+            borderRadius: '6px',
+          },
+          '&::-webkit-scrollbar-thumb': {
+            background: '#888',
+            borderRadius: '6px',
+            '&:hover': {
+              background: '#666',
+            },
+          },
+          padding: '4px',
+          marginBottom: '8px',
+        }}
+      >
+        <svg
+          ref={mainChartRef}
+          height={height}
+          style={{
+            width: `${width * timeScale}px`,
+            minWidth: '100%',
+            minHeight: '300px',
+          }}
+        />
+      </Box>
       <div
         id="gantt-chart-tooltip"
         style={{
@@ -132,6 +175,6 @@ export const GanttChart: React.FC<GanttChartProps> = ({
           pointerEvents: 'none',
         }}
       />
-    </>
+    </div>
   );
 };
