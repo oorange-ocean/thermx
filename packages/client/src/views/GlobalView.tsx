@@ -12,6 +12,8 @@ interface GlobalViewProps {
   height?: number;
   isEmbedded?: boolean;
   onSteadyStateSelect?: (steadyStateId: number) => void;
+  showToolbar?: boolean;
+  showTitle?: boolean;
 }
 
 // 定义数据类型
@@ -29,6 +31,8 @@ export const GlobalView: React.FC<GlobalViewProps> = ({
   height,
   isEmbedded = false,
   onSteadyStateSelect,
+  showToolbar = true,
+  showTitle = true,
 }) => {
   const navigate = useNavigate();
 
@@ -350,22 +354,26 @@ export const GlobalView: React.FC<GlobalViewProps> = ({
         overflow: 'hidden', // 防止内容溢出
       }}
     >
-      <Typography variant="h5" gutterBottom>
-        工况全局视图
-      </Typography>
+      {showTitle && (
+        <Typography variant="h5" gutterBottom>
+          工况全局视图
+        </Typography>
+      )}
 
-      <GlobalViewToolbar
-        heatRateRange={heatRateRange}
-        onHeatRateRangeChange={setHeatRateRange}
-        timeScale={timeScale}
-        onTimeScaleChange={setTimeScale}
-        filteredCount={
-          data.filter((d) => d.平均热耗率 >= heatRateRange[0] && d.平均热耗率 <= heatRateRange[1])
-            .length
-        }
-        totalCount={data.length}
-        heatRateExtent={d3.extent(data, (d) => d.平均热耗率) as [number, number]}
-      />
+      {showToolbar && (
+        <GlobalViewToolbar
+          heatRateRange={heatRateRange}
+          onHeatRateRangeChange={setHeatRateRange}
+          timeScale={timeScale}
+          onTimeScaleChange={setTimeScale}
+          filteredCount={
+            data.filter((d) => d.平均热耗率 >= heatRateRange[0] && d.平均热耗率 <= heatRateRange[1])
+              .length
+          }
+          totalCount={data.length}
+          heatRateExtent={d3.extent(data, (d) => d.平均热耗率) as [number, number]}
+        />
+      )}
 
       <Box
         sx={{

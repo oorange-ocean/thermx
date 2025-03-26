@@ -185,7 +185,12 @@ export const IntegratedView = () => {
             稳态负荷区间
           </Typography>
           <Box sx={{ flex: 1, overflow: 'auto' }}>
-            <GlobalView isEmbedded onSteadyStateSelect={handleSteadyStateSelect} />
+            <GlobalView
+              isEmbedded
+              onSteadyStateSelect={handleSteadyStateSelect}
+              showToolbar={false}
+              showTitle={false}
+            />
           </Box>
         </Paper>
 
