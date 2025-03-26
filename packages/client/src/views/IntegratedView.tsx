@@ -169,20 +169,6 @@ export const IntegratedView = () => {
         gap: 2,
       }}
     >
-      <Typography variant="h5" gutterBottom>
-        工况整合视图
-      </Typography>
-
-      <GlobalViewToolbar
-        heatRateRange={heatRateRange}
-        onHeatRateRangeChange={setHeatRateRange}
-        timeScale={timeScale}
-        onTimeScaleChange={setTimeScale}
-        filteredCount={data.length}
-        totalCount={data.length}
-        heatRateExtent={d3.extent(data, (d) => d.汽轮机热耗率q) as [number, number]}
-      />
-
       <Box sx={{ flex: 1, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
         {/* 左上：甘特图 */}
         <Paper

@@ -16,14 +16,15 @@ import {
   useTheme,
 } from '@mui/material';
 import {
-  Menu as MenuIcon,
   ChevronLeft as ChevronLeftIcon,
+  ChevronRight as ChevronRightIcon,
   Timeline as TimelineIcon,
   Analytics as AnalyticsIcon,
   Dashboard as DashboardIcon,
 } from '@mui/icons-material';
 
-const DRAWER_WIDTH = 240;
+const DRAWER_WIDTH = 150;
+const DRAWER_COLLAPSED_WIDTH = 60;
 
 interface MainLayoutProps {
   children: ReactNode;
@@ -47,64 +48,52 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
 
   return (
     <Box sx={{ display: 'flex', width: '100%', height: '100%', overflow: 'hidden' }}>
-      <AppBar
-        position="fixed"
-        sx={{
-          zIndex: theme.zIndex.drawer + 1,
-          transition: theme.transitions.create(['width', 'margin'], {
-            easing: theme.transitions.easing.sharp,
-            duration: theme.transitions.duration.leavingScreen,
-          }),
-        }}
-      >
-        <Toolbar>
-          <IconButton
-            color="inherit"
-            aria-label="打开菜单"
-            onClick={handleDrawerToggle}
-            edge="start"
-            sx={{ mr: 2 }}
-          >
-            <MenuIcon />
-          </IconButton>
-          <Typography variant="h6" noWrap component="div">
-            热力系统分析平台
-          </Typography>
-        </Toolbar>
-      </AppBar>
       <Drawer
         variant="permanent"
         open={open}
         sx={{
-          width: DRAWER_WIDTH,
+          width: open ? DRAWER_WIDTH : DRAWER_COLLAPSED_WIDTH,
           flexShrink: 0,
           whiteSpace: 'nowrap',
           boxSizing: 'border-box',
-          ...(open && {
-            width: DRAWER_WIDTH,
-            '& .MuiDrawer-paper': {
-              width: DRAWER_WIDTH,
-              transition: theme.transitions.create('width', {
-                easing: theme.transitions.easing.sharp,
-                duration: theme.transitions.duration.enteringScreen,
-              }),
-            },
-          }),
-          ...(!open && {
-            width: theme.spacing(7),
-            '& .MuiDrawer-paper': {
-              width: theme.spacing(7),
-              transition: theme.transitions.create('width', {
-                easing: theme.transitions.easing.sharp,
-                duration: theme.transitions.duration.leavingScreen,
-              }),
-            },
-          }),
+          '& .MuiDrawer-paper': {
+            width: open ? DRAWER_WIDTH : DRAWER_COLLAPSED_WIDTH,
+            transition: theme.transitions.create('width', {
+              easing: theme.transitions.easing.sharp,
+              duration: theme.transitions.duration.enteringScreen,
+            }),
+            overflowX: 'hidden',
+            backgroundColor: theme.palette.primary.main,
+            color: theme.palette.primary.contrastText,
+          },
         }}
       >
-        <Toolbar />
-        <Box sx={{ overflow: 'hidden', height: '100%' }}>
-          <List>
+        <Box
+          sx={{
+            height: '100%',
+            display: 'flex',
+            flexDirection: 'column',
+          }}
+        >
+          {/* Logo区域 */}
+          <Box
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              p: 2,
+              minHeight: 64,
+            }}
+          >
+            <Typography variant="h6" noWrap component="div">
+              {open ? 'THERMX' : 'T'}
+            </Typography>
+          </Box>
+
+          <Divider sx={{ backgroundColor: 'rgba(255,255,255,0.12)' }} />
+
+          {/* 菜单列表 */}
+          <List sx={{ flexGrow: 1 }}>
             {menuItems.map((item) => (
               <ListItem key={item.text} disablePadding sx={{ display: 'block' }}>
                 <ListItemButton
@@ -114,6 +103,9 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
                     minHeight: 48,
                     justifyContent: open ? 'initial' : 'center',
                     px: 2.5,
+                    '&.Mui-selected': {
+                      backgroundColor: 'rgba(255,255,255,0.08)',
+                    },
                   }}
                 >
                   <ListItemIcon
@@ -121,16 +113,35 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
                       minWidth: 0,
                       mr: open ? 3 : 'auto',
                       justifyContent: 'center',
+                      color: 'inherit',
                     }}
                   >
                     {item.icon}
                   </ListItemIcon>
-                  <ListItemText primary={item.text} sx={{ opacity: open ? 1 : 0 }} />
+                  <ListItemText
+                    primary={item.text}
+                    sx={{
+                      opacity: open ? 1 : 0,
+                      color: 'inherit',
+                    }}
+                  />
                 </ListItemButton>
               </ListItem>
             ))}
           </List>
-          <Divider />
+
+          {/* 展开/收缩按钮 */}
+          <Box
+            sx={{
+              display: 'flex',
+              justifyContent: 'flex-end',
+              p: 1,
+            }}
+          >
+            <IconButton onClick={handleDrawerToggle} sx={{ color: 'inherit' }}>
+              {open ? <ChevronLeftIcon /> : <ChevronRightIcon />}
+            </IconButton>
+          </Box>
         </Box>
       </Drawer>
       <Box
