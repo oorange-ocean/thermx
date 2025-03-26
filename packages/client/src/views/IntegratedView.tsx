@@ -169,7 +169,7 @@ export const IntegratedView = () => {
         gap: 2,
       }}
     >
-      <Box sx={{ flex: 1, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
+      <Box sx={{ flex: 1, display: 'grid', gridTemplateColumns: '6fr 4fr', gap: 2 }}>
         {/* 左上：甘特图 */}
         <Paper
           elevation={2}
@@ -177,7 +177,7 @@ export const IntegratedView = () => {
             p: 2,
             display: 'flex',
             flexDirection: 'column',
-            height: 'calc(50vh - 100px)',
+            height: '50vh',
             overflow: 'hidden',
           }}
         >
@@ -201,7 +201,7 @@ export const IntegratedView = () => {
             p: 2,
             display: 'flex',
             flexDirection: 'column',
-            height: 'calc(50vh - 100px)',
+            height: '50vh',
           }}
         >
           <Typography variant="subtitle1" gutterBottom>

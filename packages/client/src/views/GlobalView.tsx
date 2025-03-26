@@ -1,9 +1,9 @@
-import { useEffect, useRef, useState, useLayoutEffect } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Box, Typography, Slider, Tooltip, CircularProgress, Alert } from '@mui/material';
+import { Box, Typography, CircularProgress, Alert } from '@mui/material';
 import * as d3 from 'd3';
-import { StaticStateData } from 'shared-types';
 import { GlobalViewToolbar } from '../components/GlobalViewToolbar';
+import { GanttChart } from '../components/GanttChart';
 import { API_BASE_URL } from '../config';
 import { dbCache } from '../utils/indexedDBCache';
 
@@ -35,33 +35,17 @@ export const GlobalView: React.FC<GlobalViewProps> = ({
   showTitle = true,
 }) => {
   const navigate = useNavigate();
-
-  // 添加常量定义
-  const margin = { top: 20, right: 30, bottom: 40, left: 50 };
-
   const containerRef = useRef<HTMLDivElement>(null);
-  const svgRef = useRef<SVGSVGElement>(null);
-  const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
+  const [dimensions, setDimensions] = useState({ width: 800, height: 500 });
   const [data, setData] = useState<ProcessedData[]>([]);
-  const [timeRange, setTimeRange] = useState<[number, number]>([0, 100]);
   const [heatRateRange, setHeatRateRange] = useState<[number, number]>([7000, 10000]);
-  const [transform, setTransform] = useState(d3.zoomIdentity);
-  const [barHeight, setBarHeight] = useState(10);
-  const [yAxisRange, setYAxisRange] = useState<[number, number]>([200, 800]);
-  const [timeScale, setTimeScale] = useState(12); // 默认 12px = 1小时
+  const [timeScale, setTimeScale] = useState(12);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [loadingProgress, setLoadingProgress] = useState(0);
 
-  // 初始化尺寸 - 使用固定的默认值
+  // 初始化尺寸
   useEffect(() => {
-    // 设置默认固定尺寸，不依赖容器的实际大小
-    setDimensions({
-      width: 800, // 使用固定的初始宽度
-      height: 500, // 使用固定的初始高度
-    });
-
-    // 然后再设置 ResizeObserver 来处理后续的调整
     if (!containerRef.current) return;
 
     const resizeObserver = new ResizeObserver((entries) => {
@@ -69,7 +53,6 @@ export const GlobalView: React.FC<GlobalViewProps> = ({
       if (!entry) return;
 
       const rect = entry.contentRect;
-
       const minWidth = 600;
       const minHeight = 400;
       const newWidth = Math.max(rect.width - 40, minWidth);
@@ -219,105 +202,13 @@ export const GlobalView: React.FC<GlobalViewProps> = ({
     loadData();
   }, []);
 
-  // 绘制图表
-  useEffect(() => {
-    // 仅检查必要条件
-    if (!data.length || !svgRef.current) {
-      return;
+  const handleSteadyStateClick = (steadyStateId: number) => {
+    if (isEmbedded && onSteadyStateSelect) {
+      onSteadyStateSelect(steadyStateId);
+    } else {
+      navigate(`/detail/${steadyStateId}`);
     }
-
-    if (dimensions.width === 0 || dimensions.height === 0) {
-      return;
-    }
-
-    const innerWidth = dimensions.width * timeScale - margin.left - margin.right;
-    const innerHeight = dimensions.height - margin.top - margin.bottom;
-
-    if (innerWidth <= 0 || innerHeight <= 0) {
-      return;
-    }
-
-    const filteredData = data.filter(
-      (d) => d.平均热耗率 >= heatRateRange[0] && d.平均热耗率 <= heatRateRange[1]
-    );
-
-    // 清除旧的内容
-    d3.select(svgRef.current).selectAll('*').remove();
-
-    const svg = d3
-      .select(svgRef.current)
-      .append('g')
-      .attr('transform', `translate(${margin.left},${margin.top})`);
-
-    // 创建比例尺
-    const timeExtent = d3.extent(filteredData.flatMap((d) => [d.开始时间, d.结束时间])) as [
-      Date,
-      Date,
-    ];
-
-    const xScale = d3.scaleTime().domain(timeExtent).range([0, innerWidth]);
-    const yScale = d3.scaleLinear().domain([200, 800]).range([innerHeight, 0]);
-
-    // 添加坐标轴
-    svg
-      .append('g')
-      .attr('class', 'x-axis')
-      .attr('transform', `translate(0,${innerHeight})`)
-      .call(d3.axisBottom(xScale));
-
-    svg.append('g').attr('class', 'y-axis').call(d3.axisLeft(yScale));
-
-    // 修改点击事件处理
-    const handleSteadyStateClick = (steadyStateId: number) => {
-      if (isEmbedded && onSteadyStateSelect) {
-        onSteadyStateSelect(steadyStateId);
-      } else {
-        navigate(`/detail/${steadyStateId}`);
-      }
-    };
-
-    // 修改矩形的点击事件
-    const rects = svg
-      .selectAll('rect')
-      .data(filteredData)
-      .join('rect')
-      .attr('x', (d) => xScale(d.开始时间))
-      .attr('y', (d) => yScale(d.平均负荷))
-      .attr('width', (d) => Math.max(1, xScale(d.结束时间) - xScale(d.开始时间)))
-      .attr('height', 10)
-      .attr('fill', (d) => d.color)
-      .style('cursor', 'pointer')
-      .on('mouseover', (event, d) => {
-        const tooltip = document.getElementById('global-view-tooltip');
-        if (tooltip) {
-          tooltip.style.display = 'block';
-          tooltip.style.left = `${event.pageX + 10}px`;
-          tooltip.style.top = `${event.pageY - 10}px`;
-          tooltip.innerHTML = `
-            <div style="padding: 8px;">
-              <div>稳态区间: ${d.区间编号}</div>
-              <div>开始时间: ${d.开始时间.toLocaleString()}</div>
-              <div>结束时间: ${d.结束时间.toLocaleString()}</div>
-              <div>平均负荷: ${d.平均负荷.toFixed(2)} MW</div>
-              <div>平均热耗率: ${d.平均热耗率.toFixed(2)} kJ/kWh</div>
-            </div>
-          `;
-        }
-      })
-      .on('mouseout', () => {
-        const tooltip = document.getElementById('global-view-tooltip');
-        if (tooltip) {
-          tooltip.style.display = 'none';
-        }
-      })
-      .on('click', (event, d) => {
-        event.preventDefault();
-        event.stopPropagation();
-        handleSteadyStateClick(d.区间编号);
-      });
-
-    console.log('绘制完成，矩形数量:', rects.size());
-  }, [data, dimensions, heatRateRange, timeScale, navigate, isEmbedded, onSteadyStateSelect]);
+  };
 
   if (loading) {
     return (
@@ -343,15 +234,13 @@ export const GlobalView: React.FC<GlobalViewProps> = ({
       ref={containerRef}
       sx={{
         width: '100%',
-        height: 'calc(100vh - 88px)',
+        height: '100%',
         display: 'flex',
         flexDirection: 'column',
-        minWidth: '600px',
-        minHeight: '400px',
         position: 'relative',
         flex: 1,
         boxSizing: 'border-box',
-        overflow: 'hidden', // 防止内容溢出
+        overflow: 'hidden',
       }}
     >
       {showTitle && (
@@ -380,10 +269,6 @@ export const GlobalView: React.FC<GlobalViewProps> = ({
           flexGrow: 1,
           position: 'relative',
           overflow: 'auto',
-          '& svg': {
-            minWidth: '100%',
-            minHeight: '300px', // 确保 SVG 有最小高度
-          },
           '&::-webkit-scrollbar': {
             height: '12px',
             width: '12px',
@@ -403,32 +288,15 @@ export const GlobalView: React.FC<GlobalViewProps> = ({
           marginBottom: '8px',
         }}
       >
-        <svg
-          ref={svgRef}
-          height={dimensions.height || 500} // 提供默认高度
-          style={{
-            border: '1px solid #ccc',
-            width: `${dimensions.width * timeScale || 800}px`, // 提供默认宽度
-          }}
-        >
-          <g transform={`translate(${margin.left},${margin.top})`}>{/* 图表内容 */}</g>
-        </svg>
+        <GanttChart
+          data={data}
+          width={dimensions.width}
+          height={dimensions.height}
+          timeScale={timeScale}
+          heatRateRange={heatRateRange}
+          onSteadyStateSelect={handleSteadyStateClick}
+        />
       </Box>
-
-      <div
-        id="global-view-tooltip"
-        style={{
-          position: 'fixed',
-          display: 'none',
-          backgroundColor: 'rgba(255, 255, 255, 0.95)',
-          border: '1px solid #ccc',
-          borderRadius: '4px',
-          boxShadow: '0 2px 6px rgba(0,0,0,0.15)',
-          zIndex: 1000,
-          fontSize: '14px',
-          pointerEvents: 'none',
-        }}
-      />
     </Box>
   );
 };

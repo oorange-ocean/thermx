@@ -111,7 +111,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
                   <ListItemIcon
                     sx={{
                       minWidth: 0,
-                      mr: open ? 3 : 'auto',
+                      mr: open ? 1.5 : 'auto',
                       justifyContent: 'center',
                       color: 'inherit',
                     }}
@@ -154,7 +154,6 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
           overflow: 'hidden',
         }}
       >
-        <Toolbar />
         <Box
           sx={{
             flexGrow: 1,
