@@ -33,3 +33,7 @@ Thumbs.db
 
 # resources
 public/
+packages/python-server/data/
+
+#__pycache__
+**/__pycache__/
