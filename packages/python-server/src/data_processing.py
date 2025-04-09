@@ -13,6 +13,7 @@ import torch
 from tqdm import tqdm
 import os
 import sys
+from utils.plot_utils import configure_chinese_font
 import matplotlib as mpl
 import platform
 
@@ -27,6 +28,9 @@ plt.rcParams['axes.unicode_minus'] = False
 
 # 设置DPI以获得更清晰的图像
 plt.rcParams['figure.dpi'] = 150
+
+# 配置matplotlib
+configure_chinese_font()
 
 # 文件路径配置
 DATA_PATH = '../data/raw_data.csv'

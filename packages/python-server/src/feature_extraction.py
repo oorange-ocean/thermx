@@ -14,20 +14,10 @@ import torch.nn as nn
 import torch.nn.functional as F
 import os
 import sys
-import matplotlib as mpl
-import platform
+from utils.plot_utils import configure_chinese_font
 
-# 根据操作系统设置中文字体
-if platform.system() == 'Darwin':  # macOS
-    plt.rcParams['font.family'] = ['Arial Unicode MS', 'Heiti TC', 'SimHei']
-else:  # Windows 和 Linux
-    plt.rcParams['font.family'] = ['SimHei', 'DejaVu Sans']
-
-# 解决负号显示问题
-plt.rcParams['axes.unicode_minus'] = False
-
-# 设置DPI以获得更清晰的图像
-plt.rcParams['figure.dpi'] = 150
+# 配置matplotlib
+configure_chinese_font()
 
 # 文件路径配置
 DATA_PATH = '../data/raw_data.csv'
