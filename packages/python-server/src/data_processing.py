@@ -13,10 +13,20 @@ import torch
 from tqdm import tqdm
 import os
 import sys
+import matplotlib as mpl
+import platform
 
-# 设置中文字体
-plt.rcParams['font.family'] = 'SimHei'
+# 根据操作系统设置中文字体
+if platform.system() == 'Darwin':  # macOS
+    plt.rcParams['font.family'] = ['Arial Unicode MS', 'Heiti TC', 'SimHei']
+else:  # Windows 和 Linux
+    plt.rcParams['font.family'] = ['SimHei', 'DejaVu Sans']
+
+# 解决负号显示问题
 plt.rcParams['axes.unicode_minus'] = False
+
+# 设置DPI以获得更清晰的图像
+plt.rcParams['figure.dpi'] = 150
 
 # 文件路径配置
 DATA_PATH = '../data/raw_data.csv'
