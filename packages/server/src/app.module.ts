@@ -4,7 +4,6 @@ import { join } from 'path';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { DataChunkingService } from './services/data-chunking.service';
-import { DataChunkingInitializer } from './services/data-chunking-initializer.service';
 import { ScheduleModule } from '@nestjs/schedule';
 import { DataChunkingTask } from './tasks/data-chunking.task';
 import { ConfigModule, ConfigService } from '@nestjs/config';
@@ -19,10 +18,17 @@ import { SteadyStateService } from './services/steady-state.service';
 
 // 为了解决 @nestjs/schedule 中的 crypto.randomUUID 错误
 import * as crypto from 'crypto';
-// @ts-ignore
+
+declare global {
+  interface Crypto {
+    randomUUID(): string;
+  }
+}
+
 global.crypto = global.crypto || {};
-// @ts-ignore
-global.crypto.randomUUID = global.crypto.randomUUID || crypto.randomUUID;
+if (!global.crypto.randomUUID) {
+  global.crypto.randomUUID = () => crypto.randomUUID();
+}
 
 // 根据环境确定静态文件路径
 const getStaticFilePath = () => {
@@ -70,7 +76,7 @@ const getStaticFilePath = () => {
   providers: [
     AppService,
     DataChunkingService,
-    DataChunkingInitializer,
+    // DataChunkingInitializer,
     DataChunkingTask,
     SteadyStateService,
   ],
