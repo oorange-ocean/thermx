@@ -4,7 +4,7 @@ import { join } from 'path';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { DataChunkingService } from './services/data-chunking.service';
-import { DataChunkingInitializer } from './init/data-chunking.init';
+import { DataChunkingInitializer } from './services/data-chunking-initializer.service';
 import { ScheduleModule } from '@nestjs/schedule';
 import { DataChunkingTask } from './tasks/data-chunking.task';
 import { ConfigModule, ConfigService } from '@nestjs/config';
@@ -14,6 +14,8 @@ import {
   SteadyStatePeriodSchema,
   SteadyStateDetailSchema,
 } from './schemas/steady-state.schema';
+import { SteadyStateController } from './controllers/steady-state.controller';
+import { SteadyStateService } from './services/steady-state.service';
 
 // 为了解决 @nestjs/schedule 中的 crypto.randomUUID 错误
 import * as crypto from 'crypto';
@@ -64,12 +66,13 @@ const getStaticFilePath = () => {
     }),
     ScheduleModule.forRoot(),
   ],
-  controllers: [AppController],
+  controllers: [AppController, SteadyStateController],
   providers: [
     AppService,
     DataChunkingService,
     DataChunkingInitializer,
     DataChunkingTask,
+    SteadyStateService,
   ],
 })
 export class AppModule {}
