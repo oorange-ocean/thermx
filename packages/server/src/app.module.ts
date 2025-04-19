@@ -7,6 +7,13 @@ import { DataChunkingService } from './services/data-chunking.service';
 import { DataChunkingInitializer } from './init/data-chunking.init';
 import { ScheduleModule } from '@nestjs/schedule';
 import { DataChunkingTask } from './tasks/data-chunking.task';
+import { ConfigModule, ConfigService } from '@nestjs/config';
+import { MongooseModule } from '@nestjs/mongoose';
+import databaseConfig from './config/database.config';
+import {
+  SteadyStatePeriodSchema,
+  SteadyStateDetailSchema,
+} from './schemas/steady-state.schema';
 
 // 为了解决 @nestjs/schedule 中的 crypto.randomUUID 错误
 import * as crypto from 'crypto';
@@ -35,6 +42,22 @@ const getStaticFilePath = () => {
 
 @Module({
   imports: [
+    ConfigModule.forRoot({
+      isGlobal: true,
+      load: [databaseConfig],
+    }),
+    MongooseModule.forRootAsync({
+      imports: [ConfigModule],
+      useFactory: (configService: ConfigService) => ({
+        uri: configService.get<string>('database.uri'),
+        ...configService.get<Record<string, any>>('database.options'),
+      }),
+      inject: [ConfigService],
+    }),
+    MongooseModule.forFeature([
+      { name: 'SteadyStatePeriod', schema: SteadyStatePeriodSchema },
+      { name: 'SteadyStateDetail', schema: SteadyStateDetailSchema },
+    ]),
     ServeStaticModule.forRoot({
       rootPath: getStaticFilePath(),
       serveRoot: '/public',
