@@ -4,6 +4,7 @@ import { GlobalView } from './views/GlobalView';
 import { LocalView } from './views/LocalView';
 import { DetailView } from './views/DetailView';
 import { IntegratedView } from './views/IntegratedView';
+import { SteadyStatePeriodsView } from './views/SteadyStatePeriodsView';
 import { MainLayout } from './components/MainLayout';
 
 const theme = createTheme({
@@ -41,6 +42,7 @@ function App() {
               <Route path="/integrated" element={<IntegratedView />} />
               <Route path="/global" element={<GlobalView />} />
               <Route path="/local" element={<LocalView />} />
+              <Route path="/steady-state-periods" element={<SteadyStatePeriodsView />} />
               <Route
                 path="/detail/:steadyStateId"
                 element={<DetailView key={window.location.pathname} />}

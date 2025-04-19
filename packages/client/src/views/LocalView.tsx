@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Box, Typography, Select, MenuItem } from '@mui/material';
+import { Box, Typography } from '@mui/material';
 import * as d3 from 'd3';
 import type { DSVParsedArray } from 'd3';
 import { TimeDistribution } from '../components/TimeDistribution';
@@ -15,12 +15,6 @@ interface SteadyStateData {
   主汽温度: string;
   再热温度: string;
   汽轮机热耗率q: string;
-}
-
-interface ClusteringRawData {
-  稳态区间编号: string;
-  Cluster: string;
-  [key: string]: string; // 用于特征字段
 }
 
 interface ClusteringData {

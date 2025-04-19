@@ -3,8 +3,6 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import {
   Box,
   Drawer,
-  AppBar,
-  Toolbar,
   List,
   Typography,
   Divider,
@@ -21,6 +19,7 @@ import {
   Timeline as TimelineIcon,
   Analytics as AnalyticsIcon,
   Dashboard as DashboardIcon,
+  TableView as TableViewIcon,
 } from '@mui/icons-material';
 
 const DRAWER_WIDTH = 150;
@@ -44,6 +43,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
     { text: '整合视图', icon: <DashboardIcon />, path: '/integrated' },
     { text: '全局视图', icon: <TimelineIcon />, path: '/global' },
     { text: '局部视图', icon: <AnalyticsIcon />, path: '/local' },
+    { text: '稳态区间', icon: <TableViewIcon />, path: '/steady-state-periods' },
   ];
 
   return (
