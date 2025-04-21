@@ -14,6 +14,15 @@ export class SteadyStatePeriod extends Document {
 
   @Prop({ required: true })
   end_time: Date;
+
+  @Prop({ required: true })
+  avg_heat_consumption_rate: number; // 平均热耗率 (kJ/kWh)
+
+  @Prop({ required: true })
+  avg_unit_load: number; // 平均机组负荷 (MW)
+
+  @Prop({ required: true })
+  avg_boiler_efficiency: number; // 平均锅炉效率 (%)
 }
 
 @Schema()

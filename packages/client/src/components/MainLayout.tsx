@@ -21,6 +21,7 @@ import {
   Dashboard as DashboardIcon,
   TableView as TableViewIcon,
   Bolt as BoltIcon,
+  TrendingUp as TrendingUpIcon,
 } from '@mui/icons-material';
 
 const DRAWER_WIDTH = 150;
@@ -46,6 +47,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
     { text: '局部视图', icon: <AnalyticsIcon />, path: '/local' },
     { text: '稳态区间', icon: <TableViewIcon />, path: '/steady-state-periods' },
     { text: '实时数据', icon: <BoltIcon />, path: '/real-time' },
+    { text: '运行优化', icon: <TrendingUpIcon />, path: '/optimization' },
   ];
 
   return (

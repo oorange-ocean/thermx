@@ -6,6 +6,7 @@ import { DetailView } from './views/DetailView';
 import { IntegratedView } from './views/IntegratedView';
 import { SteadyStatePeriodsView } from './views/SteadyStatePeriodsView';
 import { RealTimeView } from './views/RealTimeView';
+import { OptimizationView } from './views/OptimizationView';
 import { MainLayout } from './components/MainLayout';
 
 const theme = createTheme({
@@ -45,6 +46,7 @@ function App() {
               <Route path="/local" element={<LocalView />} />
               <Route path="/steady-state-periods" element={<SteadyStatePeriodsView />} />
               <Route path="/real-time" element={<RealTimeView />} />
+              <Route path="/optimization" element={<OptimizationView />} />
               <Route
                 path="/detail/:steadyStateId"
                 element={<DetailView key={window.location.pathname} />}

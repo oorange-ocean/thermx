@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Box, Typography, CircularProgress, Alert, Tabs, Tab } from '@mui/material';
-import { styled } from '@mui/material/styles';
+import { Box, Typography, CircularProgress, Alert, Tabs } from '@mui/material';
 import { io } from 'socket.io-client';
 import { API_BASE_URL } from '../config';
 import { RealTimeData } from '../types/realTimeData';
@@ -8,25 +7,7 @@ import { PerformanceView } from './realtime/PerformanceView';
 import { BoilerView } from './realtime/BoilerView';
 import { TurbineView } from './realtime/TurbineView';
 import { AuxiliaryView } from './realtime/AuxiliaryView';
-
-// 自定义 Tab 样式
-const StyledTab = styled(Tab)({
-  '&.Mui-selected': {
-    outline: 'none',
-  },
-  '&.Mui-focusVisible': {
-    outline: 'none',
-  },
-  '&:focus': {
-    outline: 'none',
-  },
-  '&:active': {
-    outline: 'none',
-  },
-  '& .MuiTouchRipple-root': {
-    display: 'none',
-  },
-});
+import { StyledTab } from '../components/StyledTab';
 
 interface TabPanelProps {
   children?: React.ReactNode;
