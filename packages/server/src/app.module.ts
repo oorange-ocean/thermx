@@ -15,6 +15,8 @@ import {
 } from './schemas/steady-state.schema';
 import { SteadyStateController } from './controllers/steady-state.controller';
 import { SteadyStateService } from './services/steady-state.service';
+import { CsvReaderService } from './services/csv-reader.service';
+import { RealTimeDataGateway } from './gateways/real-time-data.gateway';
 
 // 为了解决 @nestjs/schedule 中的 crypto.randomUUID 错误
 import * as crypto from 'crypto';
@@ -79,6 +81,8 @@ const getStaticFilePath = () => {
     // DataChunkingInitializer,
     DataChunkingTask,
     SteadyStateService,
+    CsvReaderService,
+    RealTimeDataGateway,
   ],
 })
 export class AppModule {}
