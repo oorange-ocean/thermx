@@ -6,9 +6,10 @@ import { LineChart } from '../../components/LineChart';
 
 interface PerformanceViewProps {
   data: RealTimeData;
+  historicalData: Array<{ time: string; value: number }>;
 }
 
-export const PerformanceView: React.FC<PerformanceViewProps> = ({ data }) => {
+export const PerformanceView: React.FC<PerformanceViewProps> = ({ data, historicalData }) => {
   return (
     <Box>
       <Paper sx={{ p: 3, mb: 4 }} elevation={2}>
@@ -60,12 +61,7 @@ export const PerformanceView: React.FC<PerformanceViewProps> = ({ data }) => {
               热耗率趋势
             </Typography>
             <Box sx={{ height: 300 }}>
-              <LineChart
-                data={[{ name: data.时间, value: data.汽轮机热耗率q }]}
-                xKey="name"
-                yKey="value"
-                yAxisLabel="kJ/kWh"
-              />
+              <LineChart data={historicalData} xKey="time" yKey="value" yAxisLabel="kJ/kWh" />
             </Box>
           </Paper>
         </Grid>

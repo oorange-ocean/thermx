@@ -53,6 +53,7 @@ function TabPanel(props: TabPanelProps) {
 
 export const RealTimeView: React.FC = () => {
   const [data, setData] = useState<RealTimeData | null>(null);
+  const [historicalData, setHistoricalData] = useState<Array<{ time: string; value: number }>>([]);
   const [isConnected, setIsConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
@@ -96,6 +97,13 @@ export const RealTimeView: React.FC = () => {
       console.log('接收到实时数据:', newData);
       setData(newData);
       setLastUpdated(new Date());
+
+      // 更新历史数据，保留最近30个数据点
+      setHistoricalData((prev) => {
+        const newPoint = { time: newData.时间, value: newData.汽轮机热耗率q };
+        const updatedData = [...prev, newPoint].slice(-30);
+        return updatedData;
+      });
     });
 
     // 组件卸载时清理
@@ -162,7 +170,7 @@ export const RealTimeView: React.FC = () => {
 
       <Box sx={{ height: 'calc(100% - 49px)' }}>
         <TabPanel value={currentTab} index={0}>
-          <PerformanceView data={data} />
+          <PerformanceView data={data} historicalData={historicalData} />
         </TabPanel>
         <TabPanel value={currentTab} index={1}>
           <BoilerView data={data} />
