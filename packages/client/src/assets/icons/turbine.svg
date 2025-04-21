@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="400" height="200" viewBox="0 0 400 200" xmlns="http://www.w3.org/2000/svg">
+  <!-- 高压缸 -->
+  <g transform="translate(50,80)">
+    <rect x="0" y="-30" width="60" height="60" rx="5" fill="none" stroke="#333" stroke-width="2"/>
+    <text x="30" y="45" text-anchor="middle" font-size="12" fill="#666">高压缸</text>
+  </g>
+
+  <!-- 中压缸 -->
+  <g transform="translate(170,80)">
+    <rect x="0" y="-30" width="60" height="60" rx="5" fill="none" stroke="#333" stroke-width="2"/>
+    <text x="30" y="45" text-anchor="middle" font-size="12" fill="#666">中压缸</text>
+  </g>
+
+  <!-- 低压缸 -->
+  <g transform="translate(290,80)">
+    <rect x="0" y="-30" width="60" height="60" rx="5" fill="none" stroke="#333" stroke-width="2"/>
+    <text x="30" y="45" text-anchor="middle" font-size="12" fill="#666">低压缸</text>
+  </g>
+
+  <!-- 连接管道 -->
+  <line x1="110" y1="80" x2="170" y2="80" stroke="#333" stroke-width="2"/>
+  <line x1="230" y1="80" x2="290" y2="80" stroke="#333" stroke-width="2"/>
+
+  <!-- 进汽箭头 -->
+  <line x1="20" y1="80" x2="50" y2="80" stroke="#333" stroke-width="2"/>
+  <polygon points="45,75 50,80 45,85" fill="#333"/>
+  <text x="35" y="70" font-size="12" fill="#666">主汽</text>
+
+  <!-- 出汽箭头 -->
+  <line x1="350" y1="80" x2="380" y2="80" stroke="#333" stroke-width="2"/>
+  <polygon points="375,75 380,80 375,85" fill="#333"/>
+  <text x="365" y="70" font-size="12" fill="#666">排汽</text>
+
+  <!-- 抽汽箭头 -->
+  <line x1="80" y1="50" x2="80" y2="20" stroke="#333" stroke-width="2"/>
+  <polygon points="75,25 80,20 85,25" fill="#333"/>
+  <text x="90" y="35" font-size="12" fill="#666">一段抽汽</text>
+
+  <line x1="200" y1="50" x2="200" y2="20" stroke="#333" stroke-width="2"/>
+  <polygon points="195,25 200,20 205,25" fill="#333"/>
+  <text x="210" y="35" font-size="12" fill="#666">二段抽汽</text>
+
+  <line x1="320" y1="50" x2="320" y2="20" stroke="#333" stroke-width="2"/>
+  <polygon points="315,25 320,20 325,25" fill="#333"/>
+  <text x="330" y="35" font-size="12" fill="#666">三段抽汽</text>
+</svg> 
