@@ -21,6 +21,9 @@ import {
   RealTimeData,
   RealTimeDataSchema,
 } from './schemas/real-time-data.schema';
+import { OptimalConditionController } from './controllers/optimal-condition.controller';
+import { OptimalConditionService } from './services/optimal-condition.service';
+import { OptimalConditionPointSchema } from './schemas/optimal-condition.schema';
 
 // 为了解决 @nestjs/schedule 中的 crypto.randomUUID 错误
 import * as crypto from 'crypto';
@@ -72,6 +75,7 @@ const getStaticFilePath = () => {
       { name: 'SteadyStatePeriod', schema: SteadyStatePeriodSchema },
       { name: 'SteadyStateDetail', schema: SteadyStateDetailSchema },
       { name: RealTimeData.name, schema: RealTimeDataSchema },
+      { name: 'OptimalConditionPoint', schema: OptimalConditionPointSchema },
     ]),
     ServeStaticModule.forRoot({
       rootPath: getStaticFilePath(),
@@ -79,7 +83,11 @@ const getStaticFilePath = () => {
     }),
     ScheduleModule.forRoot(),
   ],
-  controllers: [AppController, SteadyStateController],
+  controllers: [
+    AppController,
+    SteadyStateController,
+    OptimalConditionController,
+  ],
   providers: [
     AppService,
     DataChunkingService,
@@ -87,6 +95,7 @@ const getStaticFilePath = () => {
     SteadyStateService,
     RealTimeDataService,
     RealTimeDataGateway,
+    OptimalConditionService,
   ],
 })
 export class AppModule {}
