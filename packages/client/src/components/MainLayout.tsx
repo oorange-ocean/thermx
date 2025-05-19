@@ -46,7 +46,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
     { text: '全局视图', icon: <TimelineIcon />, path: '/global' },
     { text: '局部视图', icon: <AnalyticsIcon />, path: '/local' },
     { text: '稳态区间', icon: <TableViewIcon />, path: '/steady-state-periods' },
-    { text: '实时数据', icon: <BoltIcon />, path: '/real-time' },
+    // { text: '实时数据', icon: <BoltIcon />, path: '/real-time' },
     { text: '运行优化', icon: <TrendingUpIcon />, path: '/optimization' },
   ];
 

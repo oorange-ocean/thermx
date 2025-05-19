@@ -1,8 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Box, Paper, Tabs } from '@mui/material';
 import {
-  ScatterChart,
-  Scatter,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -10,10 +8,12 @@ import {
   ResponsiveContainer,
   TooltipProps,
   Line,
+  ComposedChart,
+  Scatter,
 } from 'recharts';
 import { API_BASE_URL } from '../config';
 import { StyledTab } from '../components/StyledTab';
-import { ParameterComparisonTable } from '../components/ParameterComparisonTable';
+import { DetailView } from './DetailView';
 
 interface SteadyStatePeriod {
   _id: string;
@@ -34,6 +34,10 @@ interface OptimalConditionPoint {
   boiler_efficiency: number;
   semantic_label: string;
   comprehensive_score: number;
+}
+
+interface ChartClickEvent {
+  payload: SteadyStatePeriod;
 }
 
 const CustomTooltip = ({ active, payload }: TooltipProps<number, string>) => {
@@ -94,6 +98,7 @@ export const OptimizationView = () => {
   const [currentTab, setCurrentTab] = useState(0);
   const [steadyStateData, setSteadyStateData] = useState<SteadyStatePeriod[]>([]);
   const [optimalPoints, setOptimalPoints] = useState<OptimalConditionPoint[]>([]);
+  const [selectedPeriodId, setSelectedPeriodId] = useState<number | null>(null);
 
   // 数据过滤条件
   const filterData = (data: SteadyStatePeriod[]) => {
@@ -119,8 +124,14 @@ export const OptimizationView = () => {
         const steadyStateData = await steadyStateResponse.json();
         const optimalPointsData = await optimalPointsResponse.json();
 
-        setSteadyStateData(filterData(steadyStateData));
+        const filteredData = filterData(steadyStateData);
+        setSteadyStateData(filteredData);
         setOptimalPoints(optimalPointsData);
+
+        // 设置默认选中第一个点
+        if (filteredData.length > 0) {
+          setSelectedPeriodId(filteredData[0].period_id);
+        }
       } catch (error) {
         console.error('获取数据失败:', error);
       }
@@ -134,6 +145,7 @@ export const OptimizationView = () => {
 
   // 使用 useMemo 缓存计算结果
   const chartData = useMemo(() => {
+    console.log('处理图表数据:', steadyStateData);
     return steadyStateData.map((item) => ({
       ...item,
       value: currentTab === 0 ? item.avg_boiler_efficiency : item.avg_heat_consumption_rate,
@@ -152,6 +164,15 @@ export const OptimizationView = () => {
 
   const getYAxisLabel = () => {
     return currentTab === 0 ? '锅炉效率 (%)' : '热耗率 (kJ/kWh)';
+  };
+
+  const handleScatterClick = (props: any) => {
+    console.log('散点图点击事件:', props);
+    const { payload } = props;
+    if (payload) {
+      console.log('点击的数据:', payload);
+      setSelectedPeriodId(payload.period_id);
+    }
   };
 
   return (
@@ -175,7 +196,7 @@ export const OptimizationView = () => {
           <Paper sx={{ p: 2, height: '400px', flex: 1 }}>
             <Box sx={{ mb: 1, fontWeight: 'bold', textAlign: 'center' }}>运行工况分布</Box>
             <ResponsiveContainer width="100%" height="100%">
-              <ScatterChart margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
+              <ComposedChart margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis
                   type="number"
@@ -189,7 +210,7 @@ export const OptimizationView = () => {
                   dataKey="value"
                   name={getYAxisLabel()}
                   unit={currentTab === 0 ? '%' : 'kJ/kWh'}
-                  domain={currentTab === 0 ? [92, 95] : [7000, 9000]}
+                  domain={currentTab === 0 ? [93, 95] : [7000, 9000]}
                   width={80}
                   tickFormatter={(value) => value.toFixed(0)}
                 />
@@ -201,8 +222,19 @@ export const OptimizationView = () => {
                   shape="circle"
                   r={3}
                   isAnimationActive={false}
+                  cursor="pointer"
+                  onClick={handleScatterClick}
+                  onMouseDown={(e) => {
+                    console.log('鼠标按下事件:', e);
+                  }}
+                  onMouseUp={(e) => {
+                    console.log('鼠标释放事件:', e);
+                  }}
+                  onMouseEnter={(e) => {
+                    console.log('鼠标进入事件:', e);
+                  }}
                 />
-              </ScatterChart>
+              </ComposedChart>
             </ResponsiveContainer>
           </Paper>
 
@@ -210,21 +242,21 @@ export const OptimizationView = () => {
           <Paper sx={{ p: 2, height: '400px', flex: 1 }}>
             <Box sx={{ mb: 1, fontWeight: 'bold', textAlign: 'center' }}>最优工况曲线</Box>
             <ResponsiveContainer width="100%" height="100%">
-              <ScatterChart margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
+              <ComposedChart margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis
                   type="number"
                   dataKey="avg_unit_load"
                   name="机组负荷"
                   unit="MW"
-                  domain={[200, 700]}
+                  domain={[330, 620]}
                 />
                 <YAxis
                   type="number"
                   dataKey="value"
                   name={getYAxisLabel()}
                   unit={currentTab === 0 ? '%' : 'kJ/kWh'}
-                  domain={currentTab === 0 ? [92, 95] : [7000, 9000]}
+                  domain={currentTab === 0 ? [93, 95] : [7000, 9000]}
                   width={80}
                   tickFormatter={(value) => value.toFixed(0)}
                 />
@@ -246,16 +278,20 @@ export const OptimizationView = () => {
                   dot={false}
                   isAnimationActive={false}
                 />
-              </ScatterChart>
+              </ComposedChart>
             </ResponsiveContainer>
           </Paper>
         </Box>
 
-        {/* 参数对比表格 */}
-        <Paper sx={{ p: 2 }}>
-          <Box sx={{ mb: 1, fontWeight: 'bold' }}>参数对比</Box>
-          <ParameterComparisonTable />
-        </Paper>
+        {/* 稳态区间详情 */}
+        {selectedPeriodId && (
+          <Paper sx={{ p: 2 }}>
+            <Box sx={{ mb: 1, fontWeight: 'bold' }}>稳态区间 {selectedPeriodId} 详情</Box>
+            <Box sx={{ height: '600px' }}>
+              <DetailView steadyStateId={selectedPeriodId.toString()} isEmbedded={true} />
+            </Box>
+          </Paper>
+        )}
       </Box>
     </Box>
   );
