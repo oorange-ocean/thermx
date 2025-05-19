@@ -43,6 +43,20 @@ export const LocalViewToolbar = ({
     // Using Grid container to manage layout of multiple FormControls
     <Grid container spacing={2} alignItems="center">
       <Grid item xs={12} sm={6} md={3}>
+        <FormControl fullWidth>
+          <InputLabel>堆叠柱状图时间粒度</InputLabel>
+          <Select
+            value={timeGranularity}
+            onChange={(e) => onTimeGranularityChange(e.target.value as 'hour' | 'day')}
+            label="时间粒度"
+          >
+            <MenuItem value="hour">小时</MenuItem>
+            <MenuItem value="day">天</MenuItem>
+          </Select>
+        </FormControl>
+      </Grid>
+
+      <Grid item xs={12} sm={6} md={3}>
         {' '}
         {/* Adjust xs, sm, md for responsiveness */}
         <FormControl fullWidth>
@@ -57,20 +71,6 @@ export const LocalViewToolbar = ({
                 {param.label}
               </MenuItem>
             ))}
-          </Select>
-        </FormControl>
-      </Grid>
-
-      <Grid item xs={12} sm={6} md={3}>
-        <FormControl fullWidth>
-          <InputLabel>时间粒度</InputLabel>
-          <Select
-            value={timeGranularity}
-            onChange={(e) => onTimeGranularityChange(e.target.value as 'hour' | 'day')}
-            label="时间粒度"
-          >
-            <MenuItem value="hour">小时</MenuItem>
-            <MenuItem value="day">天</MenuItem>
           </Select>
         </FormControl>
       </Grid>

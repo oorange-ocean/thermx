@@ -89,7 +89,7 @@ export const LocalView = () => {
       }}
     >
       <Typography variant="h5" gutterBottom>
-        工况局部视图
+        工况聚类探索视图
       </Typography>
 
       <LocalViewToolbar
