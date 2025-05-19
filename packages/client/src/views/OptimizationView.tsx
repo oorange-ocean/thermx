@@ -9,9 +9,11 @@ import {
   Tooltip,
   ResponsiveContainer,
   TooltipProps,
+  Line,
 } from 'recharts';
 import { API_BASE_URL } from '../config';
 import { StyledTab } from '../components/StyledTab';
+import { ParameterComparisonTable } from '../components/ParameterComparisonTable';
 
 interface SteadyStatePeriod {
   _id: string;
@@ -24,40 +26,74 @@ interface SteadyStatePeriod {
   avg_heat_consumption_rate: number;
 }
 
+interface OptimalConditionPoint {
+  period_id: number;
+  cluster: number;
+  avg_unit_load: number;
+  avg_heat_rate: number;
+  boiler_efficiency: number;
+  semantic_label: string;
+  comprehensive_score: number;
+}
+
 const CustomTooltip = ({ active, payload }: TooltipProps<number, string>) => {
   if (!active || !payload || !payload[0]) return null;
 
-  const data = payload[0].payload as SteadyStatePeriod;
-  const startTime = new Date(data.start_time).toLocaleString();
-  const endTime = new Date(data.end_time).toLocaleString();
-
-  return (
-    <Paper sx={{ p: 1.5, backgroundColor: 'rgba(255, 255, 255, 0.9)' }}>
-      <Box sx={{ mb: 1 }}>
-        <strong>稳态区间编号：</strong> {data.period_id}
-      </Box>
-      <Box sx={{ mb: 1 }}>
-        <strong>机组负荷：</strong> {data.avg_unit_load.toFixed(2)} MW
-      </Box>
-      <Box sx={{ mb: 1 }}>
-        <strong>锅炉效率：</strong> {data.avg_boiler_efficiency.toFixed(2)} %
-      </Box>
-      <Box sx={{ mb: 1 }}>
-        <strong>热耗率：</strong> {data.avg_heat_consumption_rate.toFixed(2)} kJ/kWh
-      </Box>
-      <Box sx={{ mb: 1 }}>
-        <strong>开始时间：</strong> {startTime}
-      </Box>
-      <Box>
-        <strong>结束时间：</strong> {endTime}
-      </Box>
-    </Paper>
-  );
+  const data = payload[0].payload;
+  if ('start_time' in data) {
+    // 运行工况点的tooltip
+    const startTime = new Date(data.start_time).toLocaleString();
+    const endTime = new Date(data.end_time).toLocaleString();
+    return (
+      <Paper sx={{ p: 1.5, backgroundColor: 'rgba(255, 255, 255, 0.9)' }}>
+        <Box sx={{ mb: 1 }}>
+          <strong>稳态区间编号：</strong> {data.period_id}
+        </Box>
+        <Box sx={{ mb: 1 }}>
+          <strong>机组负荷：</strong> {data.avg_unit_load.toFixed(2)} MW
+        </Box>
+        <Box sx={{ mb: 1 }}>
+          <strong>锅炉效率：</strong> {data.avg_boiler_efficiency.toFixed(2)} %
+        </Box>
+        <Box sx={{ mb: 1 }}>
+          <strong>热耗率：</strong> {data.avg_heat_consumption_rate.toFixed(2)} kJ/kWh
+        </Box>
+        <Box sx={{ mb: 1 }}>
+          <strong>开始时间：</strong> {startTime}
+        </Box>
+        <Box>
+          <strong>结束时间：</strong> {endTime}
+        </Box>
+      </Paper>
+    );
+  } else {
+    // 最优工况点的tooltip
+    return (
+      <Paper sx={{ p: 1.5, backgroundColor: 'rgba(255, 255, 255, 0.9)' }}>
+        <Box sx={{ mb: 1 }}>
+          <strong>机组负荷：</strong> {data.avg_unit_load.toFixed(2)} MW
+        </Box>
+        <Box sx={{ mb: 1 }}>
+          <strong>锅炉效率：</strong> {data.boiler_efficiency.toFixed(2)} %
+        </Box>
+        <Box sx={{ mb: 1 }}>
+          <strong>热耗率：</strong> {data.avg_heat_rate.toFixed(2)} kJ/kWh
+        </Box>
+        <Box sx={{ mb: 1 }}>
+          <strong>语义标签：</strong> {data.semantic_label}
+        </Box>
+        <Box>
+          <strong>综合评分：</strong> {data.comprehensive_score.toFixed(3)}
+        </Box>
+      </Paper>
+    );
+  }
 };
 
 export const OptimizationView = () => {
   const [currentTab, setCurrentTab] = useState(0);
   const [steadyStateData, setSteadyStateData] = useState<SteadyStatePeriod[]>([]);
+  const [optimalPoints, setOptimalPoints] = useState<OptimalConditionPoint[]>([]);
 
   // 数据过滤条件
   const filterData = (data: SteadyStatePeriod[]) => {
@@ -75,11 +111,18 @@ export const OptimizationView = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const response = await fetch(`${API_BASE_URL}/steady-state/periods`);
-        const data = await response.json();
-        setSteadyStateData(filterData(data));
+        const [steadyStateResponse, optimalPointsResponse] = await Promise.all([
+          fetch(`${API_BASE_URL}/steady-state/periods`),
+          fetch(`${API_BASE_URL}/api/optimal-conditions`),
+        ]);
+
+        const steadyStateData = await steadyStateResponse.json();
+        const optimalPointsData = await optimalPointsResponse.json();
+
+        setSteadyStateData(filterData(steadyStateData));
+        setOptimalPoints(optimalPointsData);
       } catch (error) {
-        console.error('获取稳态数据失败:', error);
+        console.error('获取数据失败:', error);
       }
     };
     fetchData();
@@ -96,6 +139,16 @@ export const OptimizationView = () => {
       value: currentTab === 0 ? item.avg_boiler_efficiency : item.avg_heat_consumption_rate,
     }));
   }, [steadyStateData, currentTab]);
+
+  // 处理最优工况点数据
+  const optimalChartData = useMemo(() => {
+    return optimalPoints
+      .sort((a, b) => a.avg_unit_load - b.avg_unit_load)
+      .map((item) => ({
+        ...item,
+        value: currentTab === 0 ? item.boiler_efficiency : item.avg_heat_rate,
+      }));
+  }, [optimalPoints, currentTab]);
 
   const getYAxisLabel = () => {
     return currentTab === 0 ? '锅炉效率 (%)' : '热耗率 (kJ/kWh)';
@@ -116,38 +169,94 @@ export const OptimizationView = () => {
         </Tabs>
       </Paper>
 
-      <Paper sx={{ p: 2, height: '400px' }}>
-        <ResponsiveContainer width="100%" height="100%">
-          <ScatterChart margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis
-              type="number"
-              dataKey="avg_unit_load"
-              name="机组负荷"
-              unit="MW"
-              domain={['auto', 'auto']}
-            />
-            <YAxis
-              type="number"
-              dataKey="value"
-              name={getYAxisLabel()}
-              unit={currentTab === 0 ? '%' : 'kJ/kWh'}
-              domain={['auto', 'auto']}
-              width={80}
-              tickFormatter={(value) => value.toFixed(0)}
-            />
-            <Tooltip content={<CustomTooltip />} />
-            <Scatter
-              name={currentTab === 0 ? '锅炉效率' : '热耗率'}
-              data={chartData}
-              fill="#8884d8"
-              shape="circle"
-              r={3}
-              isAnimationActive={false}
-            />
-          </ScatterChart>
-        </ResponsiveContainer>
-      </Paper>
+      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+        <Box sx={{ display: 'flex', gap: 2 }}>
+          {/* 运行工况散点图 */}
+          <Paper sx={{ p: 2, height: '400px', flex: 1 }}>
+            <Box sx={{ mb: 1, fontWeight: 'bold', textAlign: 'center' }}>运行工况分布</Box>
+            <ResponsiveContainer width="100%" height="100%">
+              <ScatterChart margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis
+                  type="number"
+                  dataKey="avg_unit_load"
+                  name="机组负荷"
+                  unit="MW"
+                  domain={[200, 700]}
+                />
+                <YAxis
+                  type="number"
+                  dataKey="value"
+                  name={getYAxisLabel()}
+                  unit={currentTab === 0 ? '%' : 'kJ/kWh'}
+                  domain={currentTab === 0 ? [92, 95] : [7000, 9000]}
+                  width={80}
+                  tickFormatter={(value) => value.toFixed(0)}
+                />
+                <Tooltip content={<CustomTooltip />} />
+                <Scatter
+                  name="运行工况"
+                  data={chartData}
+                  fill="#1a237e"
+                  shape="circle"
+                  r={3}
+                  isAnimationActive={false}
+                />
+              </ScatterChart>
+            </ResponsiveContainer>
+          </Paper>
+
+          {/* 最优工况图 */}
+          <Paper sx={{ p: 2, height: '400px', flex: 1 }}>
+            <Box sx={{ mb: 1, fontWeight: 'bold', textAlign: 'center' }}>最优工况曲线</Box>
+            <ResponsiveContainer width="100%" height="100%">
+              <ScatterChart margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis
+                  type="number"
+                  dataKey="avg_unit_load"
+                  name="机组负荷"
+                  unit="MW"
+                  domain={[200, 700]}
+                />
+                <YAxis
+                  type="number"
+                  dataKey="value"
+                  name={getYAxisLabel()}
+                  unit={currentTab === 0 ? '%' : 'kJ/kWh'}
+                  domain={currentTab === 0 ? [92, 95] : [7000, 9000]}
+                  width={80}
+                  tickFormatter={(value) => value.toFixed(0)}
+                />
+                <Tooltip content={<CustomTooltip />} />
+                <Scatter
+                  name="最优工况"
+                  data={optimalChartData}
+                  fill="#90caf9"
+                  shape="circle"
+                  r={4}
+                  isAnimationActive={false}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="value"
+                  data={optimalChartData}
+                  stroke="#42a5f5"
+                  strokeWidth={2}
+                  dot={false}
+                  isAnimationActive={false}
+                />
+              </ScatterChart>
+            </ResponsiveContainer>
+          </Paper>
+        </Box>
+
+        {/* 参数对比表格 */}
+        <Paper sx={{ p: 2 }}>
+          <Box sx={{ mb: 1, fontWeight: 'bold' }}>参数对比</Box>
+          <ParameterComparisonTable />
+        </Paper>
+      </Box>
     </Box>
   );
 };

@@ -1,39 +1,83 @@
-# Dependencies
-node_modules
-.pnpm-store
+# =========================================
+# Whitelist Approach
+# Ignore everything by default
+# =========================================
+*
 
-# Build
-dist
-build
+# =========================================
+# --- Whitelisted Items ---
+# (Order matters: more specific negations should come after general ones if overriding)
+# =========================================
 
-# Environment
+# 1. Un-ignore the 'packages/' directory and its contents
+# Sub-folders/files within 'packages/' will be tracked unless explicitly ignored below
+# or by a .gitignore file within a sub-package.
+!/packages/
+
+# 2. Un-ignore all files and folders starting with a dot AT THE ROOT LEVEL
+# This includes .gitignore, .editorconfig, .prettierrc.js, .husky/, etc.
+# Specific dot-files/folders to be ignored (like .env, .idea, .vscode) will be re-added below.
+!/.*
+!/.*/
+
+# 3. Un-ignore essential root-level project files
+!/package.json
+!/pnpm-lock.yaml  # Assuming pnpm from original .gitignore. Change if using npm/yarn.
+!/README.md       # Or other readme variants like README.rst
+!/LICENSE         # Or LICENSE.md, etc.
+# Add other critical root config files like !/vite.config.js, !/tsconfig.json if they exist and are needed.
+
+# =========================================
+# --- Explicitly Ignored Items ---
+# (These re-affirm what should be ignored, especially if broadly un-ignored above,
+# or are standard ignores that should always be present)
+# =========================================
+
+# Dependencies (already covered by '*' but good for clarity if any parent folder was un-ignored)
+node_modules/
+.pnpm-store/
+
+# Build artifacts (already covered by '*' but good for clarity)
+dist/
+build/
+
+# Environment variable files (DO NOT commit actual secrets)
+# .env files were un-ignored by !/.* or !/.*/, so re-ignore them.
+# Keep .env.example or similar if it exists and is un-ignored by !/.*
 .env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
+.env.*
+!.env.example # Ensure this specific file is NOT ignored if it matches .env.* and you want to track it
 
-# IDE
-.idea
-.vscode
+# IDE configuration folders
+# These were un-ignored by !/.* or !/.*/, so re-ignore them.
+.idea/
+.vscode/
+
+# Editor swap files
 *.swp
 *.swo
 
-# Logs
-logs
+# Log files and directories
+logs/
 *.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 
-# System
+# OS-generated files
 .DS_Store
-Thumbs.db 
+Thumbs.db
 
-# resources
-public/
-packages/python-server/data/
-
-#__pycache__
+# Python cache
 **/__pycache__/
+
+# Specific resources to ignore (from original .gitignore)
+# If 'public/' is at root and should be ignored, '*' handles it.
+# If it needs to be whitelisted, add `!/public/` to the whitelist section.
+# Original .gitignore had `public/` which implies it should be ignored.
+
+# Path within 'packages/' that should be ignored (from original .gitignore)
+# Since `!/packages/` un-ignored everything in `packages`, this needs to be specifically re-ignored.
+packages/python-server/data/
+packages/server/public/ # Ensure this specific subdirectory within packages is ignored
