@@ -3,24 +3,46 @@ import { Box, Typography } from '@mui/material';
 import { LocalViewToolbar } from '../components/LocalViewToolbar';
 import { ClusterActivityByTimeChart } from '../components/ClusterActivityByTimeChart';
 import { ClusterParameterDistributionChart } from '../components/ClusterParameterDistributionChart';
+import {
+  InteractiveScatterPlot,
+  ParameterSelectionOption,
+} from '../components/InteractiveScatterPlot';
 import { useLocalViewData, ClusteringData } from '../hooks/useLocalViewData';
 
 export const LocalView = () => {
   const { data, loading, loadingProgress, error } = useLocalViewData();
 
-  // Define the new set of parameters available for selection
-  const availableParameters = [
-    { value: 'avg_unit_load' as keyof ClusteringData, label: '平均机组负荷' },
-    { value: 'avg_boiler_efficiency' as keyof ClusteringData, label: '平均锅炉效率' },
-    { value: 'avg_heat_consumption_rate' as keyof ClusteringData, label: '平均热耗率' }, // This is the raw value
-    { value: '汽轮机热耗率q' as keyof ClusteringData, label: '汽轮机热耗率q' }, // This is an alias, effectively same as avg_heat_consumption_rate
+  const availableParameters: ParameterSelectionOption[] = [
+    { value: 'avg_unit_load', label: '平均机组负荷' },
+    { value: 'avg_boiler_efficiency', label: '平均锅炉效率' },
+    { value: 'avg_heat_consumption_rate', label: '平均热耗率' },
+    { value: '汽轮机热耗率q', label: '汽轮机热耗率q' },
   ];
+  const typedAvailableParameters = availableParameters.map((p) => ({
+    ...p,
+    value: p.value as keyof ClusteringData,
+  }));
 
-  // Ensure selectedParameter is one of the new available parameter values
-  const [selectedParameter, setSelectedParameter] = useState<keyof ClusteringData>(
-    availableParameters[2].value
-  ); // Default to avg_heat_consumption_rate
+  // State for the parameter distribution chart (violin/box)
+  const [selectedDistParam, setSelectedDistParam] = useState<keyof ClusteringData>(
+    typedAvailableParameters[2].value
+  );
+
+  // State for time granularity (shared by some charts)
   const [timeGranularity, setTimeGranularity] = useState<'hour' | 'day'>('hour');
+
+  // States for InteractiveScatterPlot axes
+  const defaultScatterX =
+    typedAvailableParameters.length > 0 ? typedAvailableParameters[0].value : undefined;
+  const defaultScatterY =
+    typedAvailableParameters.length > 1 ? typedAvailableParameters[1].value : defaultScatterX;
+
+  const [scatterXAxisParam, setScatterXAxisParam] = useState<keyof ClusteringData | undefined>(
+    defaultScatterX
+  );
+  const [scatterYAxisParam, setScatterYAxisParam] = useState<keyof ClusteringData | undefined>(
+    defaultScatterY
+  );
 
   if (loading) {
     return (
@@ -52,10 +74,8 @@ export const LocalView = () => {
     );
   }
 
-  // Prepare parameters for the toolbar (value and label for display)
-  const toolbarParameters = availableParameters.map((p) => ({ value: p.value, label: p.label }));
-  const currentSelectedParameterLabel =
-    availableParameters.find((p) => p.value === selectedParameter)?.label || selectedParameter;
+  const currentSelectedDistParamLabel =
+    typedAvailableParameters.find((p) => p.value === selectedDistParam)?.label || selectedDistParam;
 
   return (
     <Box
@@ -73,31 +93,52 @@ export const LocalView = () => {
       </Typography>
 
       <LocalViewToolbar
-        selectedParameter={selectedParameter}
-        onParameterChange={(paramValue) => setSelectedParameter(paramValue as keyof ClusteringData)}
+        // Props for Distribution Chart Parameter Selector
+        selectedParameter={selectedDistParam} // Renamed for clarity
+        onParameterChange={(paramValue) => setSelectedDistParam(paramValue as keyof ClusteringData)}
+        // Props for Time Granularity Selector
         timeGranularity={timeGranularity}
         onTimeGranularityChange={setTimeGranularity}
-        parameters={toolbarParameters}
+        // Props for Scatter Plot Axis Selectors
+        scatterXAxisParam={scatterXAxisParam}
+        onScatterXAxisParamChange={setScatterXAxisParam}
+        scatterYAxisParam={scatterYAxisParam}
+        onScatterYAxisParamChange={setScatterYAxisParam}
+        parameters={typedAvailableParameters} // Common list of parameters for all dropdowns
       />
 
-      <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 2 }}>
-        <Box sx={{ display: 'flex', flex: 1, gap: 2 }}>
-          <Box sx={{ flex: 1 }}>
+      <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 2, overflow: 'hidden' }}>
+        <Box
+          sx={{
+            display: 'flex',
+            flexGrow: 2,
+            flexBasis: '40%',
+            flexShrink: 1,
+            gap: 2,
+            minHeight: '300px',
+            maxHeight: '45%',
+          }}
+        >
+          <Box sx={{ flex: 1, minWidth: 0 }}>
             <ClusterActivityByTimeChart data={data} timeGranularity={timeGranularity} />
           </Box>
-          <Box sx={{ flex: 1 }}>
+          <Box sx={{ flex: 1, minWidth: 0 }}>
             <ClusterParameterDistributionChart
               data={data}
-              selectedParameter={selectedParameter}
-              parameterLabel={currentSelectedParameterLabel}
+              selectedParameter={selectedDistParam}
+              parameterLabel={currentSelectedDistParamLabel}
             />
           </Box>
         </Box>
-        <Box sx={{ flex: 1, border: '1px dashed grey', p: 1 }}>
-          <Typography variant="subtitle2" align="center">
-            交互式散点图区域
-          </Typography>
-          {/* Placeholder for InteractiveScatterPlot */}
+        <Box
+          sx={{ flexGrow: 3, flexBasis: '60%', flexShrink: 1, minHeight: '350px', marginTop: 1 }}
+        >
+          <InteractiveScatterPlot
+            data={data}
+            availableParameters={typedAvailableParameters} // Still needed for axis labels in plot layout
+            xAxisParam={scatterXAxisParam} // Pass down the selected X-axis
+            yAxisParam={scatterYAxisParam} // Pass down the selected Y-axis
+          />
         </Box>
       </Box>
     </Box>
