@@ -7,6 +7,7 @@ import {
   Param,
   Headers,
   Res,
+  OnModuleInit,
 } from '@nestjs/common';
 import { AppService } from './app.service';
 import { createReadStream } from 'fs';
@@ -15,15 +16,79 @@ import { createGzip } from 'zlib';
 import { DataChunkingService } from './services/data-chunking.service';
 import { Readable } from 'stream';
 import { Response } from 'express';
+import { InjectModel } from '@nestjs/mongoose';
+import { Model } from 'mongoose';
+import { OptimalConditionPoint } from './schemas/optimal-condition.schema';
+import { exec } from 'child_process';
+import { promisify } from 'util';
 
 @Controller()
-export class AppController {
+export class AppController implements OnModuleInit {
   private readonly logger = new Logger(AppController.name);
+  private readonly execAsync = promisify(exec);
 
   constructor(
     private readonly appService: AppService,
     private readonly dataChunkingService: DataChunkingService,
+    @InjectModel('OptimalConditionPoint')
+    private readonly optimalConditionPointModel: Model<OptimalConditionPoint>,
   ) {}
+
+  async onModuleInit() {
+    try {
+      this.logger.log('开始初始化数据...');
+
+      // 检查最优条件点数据是否存在
+      const optimalPointsCount =
+        await this.optimalConditionPointModel.countDocuments();
+      if (optimalPointsCount === 0) {
+        this.logger.log('未检测到最优条件点数据，开始导入...');
+        try {
+          await this.execAsync(
+            'pnpm --filter server run import-optimal-points',
+          );
+          this.logger.log('最优条件点数据导入完成');
+        } catch (error) {
+          const err = error as Error;
+          this.logger.error(`最优条件点数据导入失败: ${err.message}`);
+        }
+      }
+
+      // 初始化数据分片
+      this.logger.log('开始初始化数据分片...');
+      await this.initializeDataChunks();
+      this.logger.log('数据分片初始化完成');
+    } catch (error) {
+      const err = error as Error;
+      this.logger.error(`初始化失败: ${err.message}`);
+    }
+  }
+
+  private async initializeDataChunks() {
+    try {
+      // 处理稳态数据
+      const steadyStatePath = this.getDataFilePath('steady_state_data.csv');
+      this.logger.log(`开始处理稳态数据: ${steadyStatePath}`);
+      await this.dataChunkingService.chunkDataFile(
+        steadyStatePath,
+        'steady-state',
+      );
+      this.logger.log('稳态数据处理完成');
+
+      // 处理聚类数据
+      const clusteringPath = this.getDataFilePath('clustering_data.csv');
+      this.logger.log(`开始处理聚类数据: ${clusteringPath}`);
+      await this.dataChunkingService.chunkDataFile(
+        clusteringPath,
+        'clustering',
+      );
+      this.logger.log('聚类数据处理完成');
+    } catch (error) {
+      const err = error as Error;
+      this.logger.error(`数据处理失败: ${err.message}`);
+      throw error;
+    }
+  }
 
   @Get()
   getHello(): string {
@@ -53,13 +118,13 @@ export class AppController {
   }
 
   @Get('/steady-state-data-metadata')
-  async getSteadyStateDataMetadata() {
+  async getSteadyStateDataMetadata(): Promise<Record<string, unknown>> {
     this.logger.log('获取稳态数据元信息');
     return this.dataChunkingService.getDataMetadata('steady-state');
   }
 
   @Get('/clustering-data-metadata')
-  async getClusteringDataMetadata() {
+  async getClusteringDataMetadata(): Promise<Record<string, unknown>> {
     this.logger.log('获取聚类数据元信息');
     return this.dataChunkingService.getDataMetadata('clustering');
   }
@@ -71,7 +136,7 @@ export class AppController {
     @Param('chunkId') chunkId: string,
     @Headers('Range') range: string,
     @Res({ passthrough: true }) response: Response,
-  ) {
+  ): Promise<StreamableFile> {
     this.logger.log(
       `获取稳态数据分片 ${chunkId}${range ? ` 带范围: ${range}` : ''}`,
     );
@@ -121,15 +186,18 @@ export class AppController {
       jsonStream.pipe(gzip);
       return new StreamableFile(gzip);
     } catch (error) {
-      this.logger.error(`获取分片 ${chunkId} 失败: ${error.message}`);
-      throw new Error(`分片获取失败: ${error.message}`);
+      const err = error as Error;
+      this.logger.error(`获取分片 ${chunkId} 失败: ${err.message}`);
+      throw new Error(`分片获取失败: ${err.message}`);
     }
   }
 
   @Get('/clustering-data/:chunkId')
   @Header('Content-Type', 'application/json')
   @Header('Content-Encoding', 'gzip')
-  async getClusteringDataChunk(@Param('chunkId') chunkId: string) {
+  async getClusteringDataChunk(
+    @Param('chunkId') chunkId: string,
+  ): Promise<StreamableFile> {
     this.logger.log(`获取聚类数据分片 ${chunkId}`);
 
     const chunkData = await this.dataChunkingService.getDataChunk(

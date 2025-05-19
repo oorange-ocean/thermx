@@ -17,7 +17,9 @@
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
-    "test:e2e": "jest --config ./test/jest-e2e.json"
+    "test:e2e": "jest --config ./test/jest-e2e.json",
+    "import-data": "ts-node ./src/scripts/import-steady-state-data.ts && ts-node ./src/scripts/calculate-steady-state-averages.ts",
+    "import-optimal-points": "ts-node ./src/scripts/import-optimal-condition-points.ts"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.1",

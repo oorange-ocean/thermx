@@ -64,6 +64,10 @@ async function importData() {
           period_length: periodLength,
           start_time: timestamp,
           end_time: new Date(timestamp.getTime() + (periodLength - 1) * 60000), // 假设数据间隔为1分钟
+          // 添加临时的默认值，后续会被 calculate-steady-state-averages.ts 更新
+          avg_heat_consumption_rate: 0,
+          avg_unit_load: 0,
+          avg_boiler_efficiency: 0,
         });
         processedPeriods.add(periodId);
       }

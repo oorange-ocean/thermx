@@ -25,6 +25,31 @@ export class DataChunkingService {
   }
 
   /**
+   * 清理指定类型的分片文件
+   */
+  private async cleanupChunks(
+    fileType: 'steady-state' | 'clustering',
+  ): Promise<void> {
+    try {
+      const files = await fs.readdir(this.chunksDir);
+      const pattern = new RegExp(
+        `^${fileType}-(chunk-\\d+\\.json|metadata\\.json)$`,
+      );
+
+      for (const file of files) {
+        if (pattern.test(file)) {
+          const filePath = path.join(this.chunksDir, file);
+          await fs.unlink(filePath);
+          this.logger.log(`已删除旧分片文件: ${file}`);
+        }
+      }
+    } catch (error) {
+      this.logger.error(`清理分片文件失败: ${error.message}`);
+      throw error;
+    }
+  }
+
+  /**
    * 预处理和分片CSV文件
    * @param sourceFilePath 源CSV文件路径
    * @param fileType 文件类型标识 ('steady-state' 或 'clustering')
@@ -34,6 +59,9 @@ export class DataChunkingService {
     fileType: 'steady-state' | 'clustering',
   ): Promise<void> {
     this.logger.log(`开始对 ${fileType} 数据进行分片处理...`);
+
+    // 首先清理旧的分片文件
+    await this.cleanupChunks(fileType);
 
     // 获取源文件信息
     const stats = await fs.stat(sourceFilePath);
