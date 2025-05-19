@@ -1,11 +1,16 @@
 import { Box, Select, MenuItem, FormControl, InputLabel } from '@mui/material';
 
+interface ParameterOption {
+  value: string;
+  label: string;
+}
+
 interface LocalViewToolbarProps {
   selectedParameter: string;
   onParameterChange: (parameter: string) => void;
   timeGranularity: 'hour' | 'day';
   onTimeGranularityChange: (granularity: 'hour' | 'day') => void;
-  parameters: string[];
+  parameters: ParameterOption[];
 }
 
 export const LocalViewToolbar = ({
@@ -25,8 +30,8 @@ export const LocalViewToolbar = ({
           label="参数选择"
         >
           {parameters.map((param) => (
-            <MenuItem key={param} value={param}>
-              {param}
+            <MenuItem key={param.value} value={param.value}>
+              {param.label}
             </MenuItem>
           ))}
         </Select>

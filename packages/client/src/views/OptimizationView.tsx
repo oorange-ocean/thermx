@@ -164,7 +164,6 @@ export const OptimizationView = () => {
 
   // 使用 useMemo 缓存计算结果
   const chartData = useMemo(() => {
-    console.log('处理图表数据:', steadyStateData);
     return steadyStateData.map((item) => ({
       ...item,
       value: currentTab === 0 ? item.avg_boiler_efficiency : item.avg_heat_consumption_rate,
@@ -186,10 +185,8 @@ export const OptimizationView = () => {
   };
 
   const handleScatterClick = (props: { payload: SteadyStatePeriod }) => {
-    console.log('散点图点击事件:', props);
     const { payload } = props;
     if (payload) {
-      console.log('点击的数据:', payload);
       setSelectedPeriodId(payload.period_id);
     }
   };
@@ -242,15 +239,6 @@ export const OptimizationView = () => {
                   isAnimationActive={false}
                   cursor="pointer"
                   onClick={handleScatterClick}
-                  onMouseDown={(e) => {
-                    console.log('鼠标按下事件:', e);
-                  }}
-                  onMouseUp={(e) => {
-                    console.log('鼠标释放事件:', e);
-                  }}
-                  onMouseEnter={(e) => {
-                    console.log('鼠标进入事件:', e);
-                  }}
                 >
                   {chartData.map((entry, index) => (
                     <Cell

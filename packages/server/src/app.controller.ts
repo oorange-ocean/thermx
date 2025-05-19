@@ -13,12 +13,18 @@ import { AppService } from './app.service';
 import { createReadStream } from 'fs';
 import { join } from 'path';
 import { createGzip } from 'zlib';
-import { DataChunkingService } from './services/data-chunking.service';
+import {
+  DataChunkingService,
+  ChunkMetadata,
+  CsvRecord,
+} from './services/data-chunking.service';
 import { Readable } from 'stream';
 import { Response } from 'express';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { OptimalConditionPoint } from './schemas/optimal-condition.schema';
+import { SteadyStateService } from './services/steady-state.service';
+import { SteadyStatePeriod } from './schemas/steady-state.schema';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 
@@ -30,6 +36,7 @@ export class AppController implements OnModuleInit {
   constructor(
     private readonly appService: AppService,
     private readonly dataChunkingService: DataChunkingService,
+    private readonly steadyStateService: SteadyStateService,
     @InjectModel('OptimalConditionPoint')
     private readonly optimalConditionPointModel: Model<OptimalConditionPoint>,
   ) {}
@@ -95,6 +102,20 @@ export class AppController implements OnModuleInit {
     return this.appService.getHello();
   }
 
+  @Get('api/clustered-steady-state-periods')
+  async getClusteredSteadyStatePeriods(): Promise<SteadyStatePeriod[]> {
+    this.logger.log('请求包含聚类数据的稳态区间数据');
+    try {
+      const data =
+        await this.steadyStateService.findAllPeriodsWithClusterData();
+      return data;
+    } catch (error) {
+      const err = error as Error;
+      this.logger.error(`获取聚类稳态区间数据失败: ${err.message}`);
+      throw err;
+    }
+  }
+
   /**
    * 根据环境获取数据文件路径
    * 开发环境: 项目的public目录
@@ -118,13 +139,13 @@ export class AppController implements OnModuleInit {
   }
 
   @Get('/steady-state-data-metadata')
-  async getSteadyStateDataMetadata(): Promise<Record<string, unknown>> {
+  async getSteadyStateDataMetadata(): Promise<ChunkMetadata> {
     this.logger.log('获取稳态数据元信息');
     return this.dataChunkingService.getDataMetadata('steady-state');
   }
 
   @Get('/clustering-data-metadata')
-  async getClusteringDataMetadata(): Promise<Record<string, unknown>> {
+  async getClusteringDataMetadata(): Promise<ChunkMetadata> {
     this.logger.log('获取聚类数据元信息');
     return this.dataChunkingService.getDataMetadata('clustering');
   }
@@ -142,10 +163,11 @@ export class AppController implements OnModuleInit {
     );
 
     try {
-      const chunkData = await this.dataChunkingService.getDataChunk(
-        'steady-state',
-        parseInt(chunkId, 10),
-      );
+      const chunkData: CsvRecord[] =
+        await this.dataChunkingService.getDataChunk(
+          'steady-state',
+          parseInt(chunkId, 10),
+        );
 
       const jsonData = JSON.stringify(chunkData);
 
@@ -200,7 +222,7 @@ export class AppController implements OnModuleInit {
   ): Promise<StreamableFile> {
     this.logger.log(`获取聚类数据分片 ${chunkId}`);
 
-    const chunkData = await this.dataChunkingService.getDataChunk(
+    const chunkData: CsvRecord[] = await this.dataChunkingService.getDataChunk(
       'clustering',
       parseInt(chunkId, 10),
     );

@@ -20,11 +20,15 @@ export class SteadyStateService {
     private readonly detailModel: Model<SteadyStateDetail>,
   ) {}
 
-  async findAllPeriods() {
-    return this.periodModel.find().sort({ period_id: 1 });
+  async findAllPeriods(): Promise<SteadyStatePeriod[]> {
+    return this.periodModel.find().sort({ period_id: 1 }).exec();
   }
 
-  async findPeriodById(periodId: number) {
+  async findAllPeriodsWithClusterData(): Promise<SteadyStatePeriod[]> {
+    return this.periodModel.find().sort({ period_id: 1 }).exec();
+  }
+
+  async findPeriodById(periodId: number): Promise<SteadyStatePeriod> {
     const period = await this.periodModel.findOne({ period_id: periodId });
     if (!period) {
       throw new NotFoundException(`稳态区间 ${periodId} 未找到`);

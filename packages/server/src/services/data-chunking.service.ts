@@ -1,7 +1,51 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { createReadStream, createWriteStream, promises as fs } from 'fs';
+import { createReadStream, promises as fs } from 'fs';
 import * as path from 'path';
 import * as csv from 'csv-parser';
+
+// Define interfaces for structured data
+interface BaseRecord {
+  [key: string]: string; // CSVs are initially parsed as strings
+}
+
+// Specific structure for steady_state_data.csv records (adjust fields as necessary)
+export interface SteadyStateCsvRecord extends BaseRecord {
+  稳态区间编号: string;
+  时间: string;
+  主汽压力: string;
+  主汽温度: string;
+  再热温度: string;
+  汽轮机热耗率q: string;
+  // Add other fields if they exist in steady_state_data.csv
+}
+
+// Specific structure for clustering_data.csv records (adjust fields as necessary)
+export interface ClusteringCsvRecord extends BaseRecord {
+  Cluster: string;
+  稳态区间编号: string;
+  // feature_0 ... feature_63 are implicitly covered by BaseRecord
+  // Add other specific fields if they exist in clustering_data.csv
+}
+
+export type CsvRecord = SteadyStateCsvRecord | ClusteringCsvRecord;
+
+export interface ChunkInfo {
+  index: number;
+  fileName: string;
+  recordCount: number;
+  startRecord: number;
+  endRecord: number;
+}
+
+export interface ChunkMetadata {
+  fileType: 'steady-state' | 'clustering';
+  totalSize: number;
+  totalRecords: number;
+  totalChunks: number;
+  chunkSize: number;
+  lastModified: string;
+  chunks: ChunkInfo[];
+}
 
 @Injectable()
 export class DataChunkingService {
@@ -20,7 +64,8 @@ export class DataChunkingService {
     try {
       await fs.mkdir(this.chunksDir, { recursive: true });
     } catch (error) {
-      this.logger.error(`创建分片目录失败: ${error.message}`);
+      const err = error as Error;
+      this.logger.error(`创建分片目录失败: ${err.message}`);
     }
   }
 
@@ -44,8 +89,9 @@ export class DataChunkingService {
         }
       }
     } catch (error) {
-      this.logger.error(`清理分片文件失败: ${error.message}`);
-      throw error;
+      const err = error as Error;
+      this.logger.error(`清理分片文件失败: ${err.message}`);
+      throw err;
     }
   }
 
@@ -68,11 +114,11 @@ export class DataChunkingService {
     const totalSize = stats.size;
 
     // 首先读取并解析文件，计算记录总数和分片信息
-    const records: any[] = [];
+    const records: CsvRecord[] = [];
     await new Promise<void>((resolve, reject) => {
       createReadStream(sourceFilePath)
         .pipe(csv())
-        .on('data', (data) => records.push(data))
+        .on('data', (data) => records.push(data as CsvRecord))
         .on('end', () => resolve())
         .on('error', (error) => reject(error));
     });
@@ -85,14 +131,14 @@ export class DataChunkingService {
     );
 
     // 生成元数据
-    const metadata = {
+    const metadata: ChunkMetadata = {
       fileType,
       totalSize,
       totalRecords,
       totalChunks,
       chunkSize: this.CHUNK_SIZE,
       lastModified: new Date().toISOString(),
-      chunks: [] as any[],
+      chunks: [],
     };
 
     // 创建分片文件
@@ -127,17 +173,20 @@ export class DataChunkingService {
   /**
    * 获取数据文件的元数据
    */
-  async getDataMetadata(fileType: 'steady-state' | 'clustering'): Promise<any> {
+  async getDataMetadata(
+    fileType: 'steady-state' | 'clustering',
+  ): Promise<ChunkMetadata> {
     try {
       const metadataPath = path.join(
         this.chunksDir,
         `${fileType}-metadata.json`,
       );
       const metadataContent = await fs.readFile(metadataPath, 'utf8');
-      return JSON.parse(metadataContent);
+      return JSON.parse(metadataContent) as ChunkMetadata;
     } catch (error) {
-      this.logger.error(`获取 ${fileType} 元数据失败: ${error.message}`);
-      throw new Error(`元数据不可用: ${error.message}`);
+      const err = error as Error; // Type assertion
+      this.logger.error(`获取 ${fileType} 元数据失败: ${err.message}`);
+      throw new Error(`元数据不可用: ${err.message}`);
     }
   }
 
@@ -147,19 +196,20 @@ export class DataChunkingService {
   async getDataChunk(
     fileType: 'steady-state' | 'clustering',
     chunkIndex: number,
-  ): Promise<any> {
+  ): Promise<CsvRecord[]> {
     try {
       const chunkPath = path.join(
         this.chunksDir,
         `${fileType}-chunk-${chunkIndex}.json`,
       );
       const chunkContent = await fs.readFile(chunkPath, 'utf8');
-      return JSON.parse(chunkContent);
+      return JSON.parse(chunkContent) as CsvRecord[];
     } catch (error) {
+      const err = error as Error; // Type assertion
       this.logger.error(
-        `获取 ${fileType} 数据分片 ${chunkIndex} 失败: ${error.message}`,
+        `获取 ${fileType} 数据分片 ${chunkIndex} 失败: ${err.message}`,
       );
-      throw new Error(`分片不可用: ${error.message}`);
+      throw new Error(`分片不可用: ${err.message}`);
     }
   }
 }
