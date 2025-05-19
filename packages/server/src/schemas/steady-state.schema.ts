@@ -23,6 +23,12 @@ export class SteadyStatePeriod extends Document {
 
   @Prop({ required: true })
   avg_boiler_efficiency: number; // 平均锅炉效率 (%)
+
+  @Prop({ required: false }) // 聚类结果，可能为空
+  cluster?: number;
+
+  @Prop({ required: false }) // 语义标签，可能为空
+  semantic_label?: string;
 }
 
 @Schema()

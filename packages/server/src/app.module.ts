@@ -15,12 +15,6 @@ import {
 } from './schemas/steady-state.schema';
 import { SteadyStateController } from './controllers/steady-state.controller';
 import { SteadyStateService } from './services/steady-state.service';
-import { RealTimeDataService } from './services/real-time-data.service';
-import { RealTimeDataGateway } from './gateways/real-time-data.gateway';
-import {
-  RealTimeData,
-  RealTimeDataSchema,
-} from './schemas/real-time-data.schema';
 import { OptimalConditionController } from './controllers/optimal-condition.controller';
 import { OptimalConditionService } from './services/optimal-condition.service';
 import { OptimalConditionPointSchema } from './schemas/optimal-condition.schema';
@@ -74,7 +68,6 @@ const getStaticFilePath = () => {
     MongooseModule.forFeature([
       { name: 'SteadyStatePeriod', schema: SteadyStatePeriodSchema },
       { name: 'SteadyStateDetail', schema: SteadyStateDetailSchema },
-      { name: RealTimeData.name, schema: RealTimeDataSchema },
       { name: 'OptimalConditionPoint', schema: OptimalConditionPointSchema },
     ]),
     ServeStaticModule.forRoot({
@@ -93,8 +86,6 @@ const getStaticFilePath = () => {
     DataChunkingService,
     DataChunkingTask,
     SteadyStateService,
-    RealTimeDataService,
-    RealTimeDataGateway,
     OptimalConditionService,
   ],
 })

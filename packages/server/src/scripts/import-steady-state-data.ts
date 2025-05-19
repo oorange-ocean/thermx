@@ -48,6 +48,37 @@ async function importData() {
       skip_empty_lines: true,
     }) as CsvRow[];
 
+    // 读取聚类数据
+    const clusteringCsvFilePath = join(
+      __dirname,
+      '../../public/clustering_data.csv',
+    );
+    const clusteringFileContent = fs.readFileSync(
+      clusteringCsvFilePath,
+      'utf-8',
+    );
+    const clusteringRows = parseSync(clusteringFileContent, {
+      columns: true,
+      skip_empty_lines: true,
+    }) as CsvRow[];
+
+    // 将聚类数据转换为 period_id 到聚类信息的映射
+    const clusteringDataMap = new Map<
+      number,
+      { cluster: number; semantic_label: string }
+    >();
+    for (const row of clusteringRows) {
+      const periodId = parseInt(row['稳态区间编号']);
+      const cluster = parseInt(row['Cluster']);
+      const semanticLabel = row['语义标签'];
+      if (!isNaN(periodId) && !isNaN(cluster) && semanticLabel) {
+        clusteringDataMap.set(periodId, {
+          cluster,
+          semantic_label: semanticLabel,
+        });
+      }
+    }
+
     // 用于跟踪已处理的稳态区间
     const processedPeriods = new Set<number>();
 
@@ -59,6 +90,8 @@ async function importData() {
       // 如果是新的稳态区间，创建 SteadyStatePeriod 记录
       if (!processedPeriods.has(periodId)) {
         const timestamp = new Date(row['时间']);
+        const clusteringInfo = clusteringDataMap.get(periodId);
+
         await SteadyStatePeriodModel.create({
           period_id: periodId,
           period_length: periodLength,
@@ -68,6 +101,10 @@ async function importData() {
           avg_heat_consumption_rate: 0,
           avg_unit_load: 0,
           avg_boiler_efficiency: 0,
+          cluster: clusteringInfo ? clusteringInfo.cluster : undefined,
+          semantic_label: clusteringInfo
+            ? clusteringInfo.semantic_label
+            : undefined,
         });
         processedPeriods.add(periodId);
       }

@@ -14,7 +14,9 @@
     "start:pm2:dev": "pm2 start ecosystem.config.js --env development",
     "stop:pm2": "pm2 stop ecosystem.config.js",
     "restart:pm2": "pm2 restart ecosystem.config.js",
-    "import-data": "pnpm --filter server run import-data"
+    "import-data": "pnpm --filter server run import-data",
+    "import-optimal-points": "pnpm --filter server run import-optimal-points",
+    "import-all": "pnpm run import-data && pnpm run import-optimal-points"
   },
   "keywords": [],
   "author": "",

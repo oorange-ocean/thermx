@@ -10,10 +10,21 @@ import {
   Line,
   ComposedChart,
   Scatter,
+  Cell,
 } from 'recharts';
 import { API_BASE_URL } from '../config';
 import { StyledTab } from '../components/StyledTab';
 import { DetailView } from './DetailView';
+
+// 定义颜色映射
+const CLUSTER_COLORS = [
+  '#FF6384', // Red
+  '#36A2EB', // Blue
+  '#FFCE56', // Yellow
+  '#4BC0C0', // Teal
+  '#9966FF', // Purple
+  '#FF9F40', // Orange
+];
 
 interface SteadyStatePeriod {
   _id: string;
@@ -24,6 +35,8 @@ interface SteadyStatePeriod {
   avg_unit_load: number;
   avg_boiler_efficiency: number;
   avg_heat_consumption_rate: number;
+  cluster?: number;
+  semantic_label?: string;
 }
 
 interface OptimalConditionPoint {
@@ -36,15 +49,11 @@ interface OptimalConditionPoint {
   comprehensive_score: number;
 }
 
-interface ChartClickEvent {
-  payload: SteadyStatePeriod;
-}
-
 const CustomTooltip = ({ active, payload }: TooltipProps<number, string>) => {
   if (!active || !payload || !payload[0]) return null;
 
-  const data = payload[0].payload;
-  if ('start_time' in data) {
+  const data = payload[0].payload as SteadyStatePeriod | OptimalConditionPoint;
+  if ('start_time' in data && 'period_length' in data) {
     // 运行工况点的tooltip
     const startTime = new Date(data.start_time).toLocaleString();
     const endTime = new Date(data.end_time).toLocaleString();
@@ -68,6 +77,16 @@ const CustomTooltip = ({ active, payload }: TooltipProps<number, string>) => {
         <Box>
           <strong>结束时间：</strong> {endTime}
         </Box>
+        {typeof data.cluster !== 'undefined' && (
+          <Box sx={{ mb: 1 }}>
+            <strong>聚类：</strong> {data.cluster}
+          </Box>
+        )}
+        {data.semantic_label && (
+          <Box>
+            <strong>语义标签：</strong> {data.semantic_label}
+          </Box>
+        )}
       </Paper>
     );
   } else {
@@ -166,7 +185,7 @@ export const OptimizationView = () => {
     return currentTab === 0 ? '锅炉效率 (%)' : '热耗率 (kJ/kWh)';
   };
 
-  const handleScatterClick = (props: any) => {
+  const handleScatterClick = (props: { payload: SteadyStatePeriod }) => {
     console.log('散点图点击事件:', props);
     const { payload } = props;
     if (payload) {
@@ -218,7 +237,6 @@ export const OptimizationView = () => {
                 <Scatter
                   name="运行工况"
                   data={chartData}
-                  fill="#1a237e"
                   shape="circle"
                   r={3}
                   isAnimationActive={false}
@@ -233,7 +251,18 @@ export const OptimizationView = () => {
                   onMouseEnter={(e) => {
                     console.log('鼠标进入事件:', e);
                   }}
-                />
+                >
+                  {chartData.map((entry, index) => (
+                    <Cell
+                      key={`cell-${index}`}
+                      fill={
+                        typeof entry.cluster === 'number'
+                          ? CLUSTER_COLORS[entry.cluster % CLUSTER_COLORS.length]
+                          : '#1a237e' // 默认颜色
+                      }
+                    />
+                  ))}
+                </Scatter>
               </ComposedChart>
             </ResponsiveContainer>
           </Paper>
